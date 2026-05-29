@@ -20,7 +20,7 @@ from .collector import collect_once
 # ============ 配置 ============
 PLUG_IP = os.environ.get("PLUG_IP", "")
 PLUG_TOKEN = os.environ.get("PLUG_TOKEN", "")
-COLLECT_INTERVAL = max(int(os.environ.get("COLLECT_INTERVAL", "60")), 5)  # 最低5秒, 防止过快
+COLLECT_INTERVAL = max(int(os.environ.get("COLLECT_INTERVAL", "30")), 5)  # 最低5秒, 防止过快
 DB_PATH = os.environ.get("DB_PATH", "/data/power_data.db")
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "0"))  # 数据保留天数, 0=永不清理
 PORT = int(os.environ.get("PORT", "8080"))

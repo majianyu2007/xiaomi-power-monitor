@@ -16,7 +16,7 @@ COPY app/ ./app/
 COPY frontend/ ./frontend/
 
 ENV PLUG_IP=""
-ENV COLLECT_INTERVAL=60
+ENV COLLECT_INTERVAL=30
 ENV DB_PATH=/data/power_data.db
 ENV RETENTION_DAYS=0
 ENV PORT=8080

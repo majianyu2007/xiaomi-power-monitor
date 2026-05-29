@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - COLLECT_INTERVAL=${COLLECT_INTERVAL:-60}
+      - COLLECT_INTERVAL=${COLLECT_INTERVAL:-30}
       - DB_PATH=/data/power_data.db
       - RETENTION_DAYS=${RETENTION_DAYS:-0}
       - PORT=8080
