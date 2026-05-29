@@ -1,5 +1,10 @@
 """
 小米智能插座 功耗监控 - 采集器 (多设备版)
+
+修复:
+- 缺失传感器值存为 None 而非 0（区分「没读到」和「0W」）
+- power_on 严格布尔判断
+- 添加网络超时
 """
 
 import logging
@@ -20,6 +25,7 @@ PROPERTIES = [
 
 MAX_RETRIES = 3
 RETRY_DELAY = 2
+SOCKET_TIMEOUT = 5  # 秒
 
 # 预编译 MIoT 属性映射，支持不同型号的属性表
 DEVICE_PROPS = {
@@ -38,27 +44,61 @@ def get_properties_for_model(model: str) -> list[dict]:
     return DEVICE_PROPS.get(model, DEVICE_PROPS["default"])
 
 
+def _parse_int(val) -> int | None:
+    """安全解析整数，失败返回 None"""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_float(val) -> float | None:
+    """安全解析浮点数，失败返回 None"""
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
 def collect_once(ip: str, token: str, model: str = "") -> dict:
-    """采集一次功率数据，带重试"""
+    """采集一次功率数据，带重试和超时。
+    
+    Returns:
+        reachable=True 时: 完整数据 dict，缺失值为 None
+        reachable=False 时: {"reachable": False}
+    """
     from miio import Device
 
-    plug = Device(ip=ip, token=token)
     props = get_properties_for_model(model)
 
     for attempt in range(MAX_RETRIES):
         try:
+            plug = Device(ip=ip, token=token, timeout=SOCKET_TIMEOUT)
             result = plug.send("get_properties", props)
             vals = {}
             for r in result:
                 if r.get("code") == 0:
                     vals[r["did"]] = r["value"]
 
+            # power: 严格布尔判断 — "on"/True/1 → 1, 其余 → 0
+            power_val = vals.get("power")
+            if power_val is True or power_val == 1 or power_val == "on":
+                power_on = 1
+            elif power_val is False or power_val == 0 or power_val == "off" or power_val is None:
+                power_on = 0
+            else:
+                power_on = 1 if bool(power_val) else 0
+
             return {
                 "reachable": True,
-                "power_on": 1 if vals.get("power") else 0,
-                "power_w": float(vals.get("electric_power", 0)),
-                "temperature": int(vals.get("temperature", 0)),
-                "power_consumption": int(vals.get("power_consumption", 0)),
+                "power_on": power_on,
+                "power_w": _parse_float(vals.get("electric_power")),      # None 而非 0
+                "temperature": _parse_int(vals.get("temperature")),        # None 而非 0
+                "power_consumption": _parse_int(vals.get("power_consumption")),  # None 而非 0
             }
         except Exception as e:
             log.warning(f"[{ip}] 采集失败 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}")

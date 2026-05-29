@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY frontend/ ./frontend/
 
-ENV PLUG_IP=192.168.10.203
+ENV PLUG_IP=""
 ENV PLUG_TOKEN=""
 ENV COLLECT_INTERVAL=60
 ENV DB_PATH=/data/power_data.db

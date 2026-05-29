@@ -38,7 +38,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("power_monitor")
 
-db = PowerDB(DB_PATH)
+db = PowerDB(DB_PATH, collect_interval=COLLECT_INTERVAL)
 
 # ============ 设备管理 ============
 
@@ -175,11 +175,16 @@ def api_heatmap(device_id: str, days: int = 14):
 
 @app.get("/api/stats/{device_id}/cost")
 def api_cost(device_id: str, days: int = 30):
-    peak = PEAK_RATE if PEAK_RATE else ELECTRICITY_RATE
-    valley = VALLEY_RATE if VALLEY_RATE else ELECTRICITY_RATE
+    # 只有峰谷都设置了才用分时计价
+    if PEAK_RATE is not None and VALLEY_RATE is not None:
+        peak, valley = PEAK_RATE, VALLEY_RATE
+        is_tou = True
+    else:
+        peak, valley = ELECTRICITY_RATE, ELECTRICITY_RATE
+        is_tou = False
     result = db.get_cost_estimate(device_id, days=days, peak_rate=peak, valley_rate=valley)
     result["flat_rate"] = ELECTRICITY_RATE
-    result["is_tou"] = bool(PEAK_RATE or VALLEY_RATE)  # 分时电价?
+    result["is_tou"] = is_tou
     return result
 
 
@@ -199,7 +204,7 @@ def api_config():
         "electricity_rate": ELECTRICITY_RATE,
         "peak_rate": PEAK_RATE or None,
         "valley_rate": VALLEY_RATE or None,
-        "is_tou": bool(PEAK_RATE or VALLEY_RATE),
+        "is_tou": PEAK_RATE is not None and VALLEY_RATE is not None,
         "standby_threshold": STANDBY_THRESHOLD,
         "collect_interval": COLLECT_INTERVAL,
         "devices": [{"id": d["id"], "name": d.get("name", d["id"])}

@@ -249,7 +249,7 @@ async function init() {
     }
     renderDeviceTabs(devices);
     switchDevice(devices[0].device_id);
-  } catch(e) { console.error('Init failed:', e); }
+  } catch(e) { console.error('Init failed:', e); document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>加载失败，请刷新重试</div></div>'; }
   setInterval(() => { if (currentDevice) refresh(currentDevice); }, 30000);
   updateTime();
   setInterval(updateTime, 1000);
@@ -257,11 +257,13 @@ async function init() {
 
 function renderDeviceTabs(devices) {
   const el = document.getElementById('deviceTabs');
-  el.innerHTML = devices.map(d =>
-    `<div class="device-tab" data-id="${d.device_id}" onclick="switchDevice('${d.device_id}')">
-      <span class="live-dot" id="dot_${d.device_id}"></span>${d.name || d.device_id}
-    </div>`
-  ).join('');
+  el.innerHTML = devices.map(d => {
+    const safeName = (d.name || d.device_id).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]||c));
+    const safeId = d.device_id.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]||c));
+    return `<div class="device-tab" data-id="${safeId}" onclick="switchDevice('${safeId}')">
+      <span class="live-dot" id="dot_${safeId}"></span>${safeName}
+    </div>`;
+  }).join('');
 }
 
 async function switchDevice(deviceId) {

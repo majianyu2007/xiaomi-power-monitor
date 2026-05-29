@@ -95,7 +95,7 @@ python3 -m micloud
 pip install -r requirements.txt
 export PLUG_IP=192.168.10.203
 export PLUG_TOKEN=your_token
-python3 -m app.main
+python3 -m app
 ```
 
 ## 📋 支持设备
