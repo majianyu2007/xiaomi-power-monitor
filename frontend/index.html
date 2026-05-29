@@ -129,17 +129,7 @@ body {
   padding: 2px 8px; color: var(--md-on-surface-variant); font-weight: 400;
 }
 
-/* Outage banner */
-.outage-banner {
-  background: linear-gradient(135deg, #42200688, #7c2d1288);
-  border: 1px solid #ea580c88;
-  border-radius: 12px;
-  padding: 14px 20px;
-  margin-bottom: 20px;
-  display: flex; align-items: center; gap: 10px;
-  font-size: 0.9rem;
-}
-.outage-banner .icon { font-size: 1.3rem; }
+
 
 /* Footer */
 .footer {
@@ -172,10 +162,7 @@ body {
 </div>
 
 <div class="container">
-  <div id="outageBanner" style="display:none" class="outage-banner">
-    <span class="icon">🔌</span>
-    <span>宿舍断电时段 (23:30-06:00)，插座可能不可达，数据采集中断</span>
-  </div>
+  
 
   <div class="device-tabs" id="deviceTabs"></div>
 
@@ -279,8 +266,7 @@ async function init() {
   } catch(e) {
     console.error('Init failed:', e);
   }
-  checkOutage();
-  setInterval(checkOutage, 60000);
+  
   setInterval(() => { if (currentDevice) refresh(currentDevice); }, 30000);
   updateTime();
   setInterval(updateTime, 1000);
@@ -291,13 +277,7 @@ function updateTime() {
   document.getElementById('timePill').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
 }
 
-async function checkOutage() {
-  try {
-    const res = await fetch(`${API}/api/outage`);
-    const data = await res.json();
-    document.getElementById('outageBanner').style.display = data.is_night_outage ? 'flex' : 'none';
-  } catch(e) {}
-}
+
 
 function renderDeviceTabs() {
   const el = document.getElementById('deviceTabs');

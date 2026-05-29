@@ -2,7 +2,7 @@
 
 类 SmokePing 风格的实时功耗监控面板，Material Design 3 深色主题。
 
-支持多插座同时监控，自动识别宿舍断电时段 (23:30-06:00) 并优雅降级。
+支持多插座同时监控，设备不可达时优雅降级（标记为 offline，不刷日志）。
 
 ![Dashboard Preview](https://img.shields.io/badge/MD3-暗色主题-9c27b0?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-3776ab?style=flat-square)
@@ -14,7 +14,6 @@
 - 📊 今日分钟级实时曲线 + 24h min/avg/max 柱状图 + 7天 kWh 趋势
 - 🌡️ 插头温度趋势追踪
 - 🔌 **多插座支持** — 一个面板监控所有插座
-- 🌙 宿舍断电检测 (23:30-06:00) — 断电期间单次探测，不刷日志
 - 📱 响应式 MD3 深色 UI
 - 🐳 Docker Compose 一键部署
 - 💾 SQLite 持久化（Docker Volume）

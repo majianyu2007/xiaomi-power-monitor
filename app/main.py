@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .db import PowerDB
-from .collector import smart_collect
+from .collector import collect_once
 
 # ============ 配置 ============
 PLUG_IP = os.environ.get("PLUG_IP", "192.168.10.203")
@@ -82,13 +82,9 @@ if not devices_config:
 
 def collect_and_store():
     """遍历所有设备采集"""
-    import datetime as _dt
-    is_outage = _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=8))).hour >= 23 or \
-                _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=8))).hour < 6
-
     for dev in devices_config:
         try:
-            data = smart_collect(dev["ip"], dev["token"], dev.get("model", DEFAULT_MODEL))
+            data = collect_once(dev["ip"], dev["token"], dev.get("model", DEFAULT_MODEL))
             ts = db.insert(device_id=dev["id"], **data)
             if data.get("reachable"):
                 log.info(
@@ -98,7 +94,7 @@ def collect_and_store():
                     f"| {data.get('temperature', 0)}°C"
                 )
             else:
-                log.info(f"○ [{dev['name']}] {ts} | 不可达 {'(断电?)' if is_outage else ''}")
+                log.info(f"○ [{dev['name']}] {ts} | 不可达")
         except Exception as e:
             log.error(f"[{dev['name']}] 采集异常: {e}")
 
@@ -169,12 +165,6 @@ def api_hourly_stats(device_id: str, days: int = 2):
 @app.get("/api/stats/{device_id}/daily")
 def api_daily_stats(device_id: str, days: int = 7):
     return db.get_daily_stats(device_id, days=days)
-
-
-@app.get("/api/outage")
-def api_outage():
-    from .collector import is_night_outage
-    return {"is_night_outage": is_night_outage()}
 
 
 # ============ 前端 ============
