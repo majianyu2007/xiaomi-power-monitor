@@ -1059,7 +1059,7 @@
       border: 1px solid var(--border-color);
     }
     
-    /* 空比状态 */
+    /* 空白状态 */
     .empty-state {
       text-align: center;
       padding: 70px 20px;
@@ -1085,8 +1085,7 @@
       font-weight: 600;
     }
     
-    /* 响应式适配 */
-    @media (max-width: 1100px) {
+        @media (max-width: 1100px) {
       .hero-glass, .section-grid {
         grid-template-columns: 1fr;
       }
@@ -1405,6 +1404,7 @@
                   <canvas id="chartHourly"></canvas>
                 </div>
               </div>
+              ${buildDeviceEventLogCard(readings, config)}
             </div>
             <div class="section-col">
               ${buildPeakCard(peak, label)}
@@ -1417,9 +1417,9 @@
                   <canvas id="chartTemp"></canvas>
                 </div>
               </div>
+              ${buildSafetyDiagnosticsCard(readings, today, peak)}
+              ${buildTimeOfDayEnergyCard(hourly)}
               ${buildCostCard(cost, config)}
-              ${buildPeakHourCard(hourly)}
-              ${buildCarbonCard(cost)}
             </div>
           </div>
         `;
@@ -1457,7 +1457,7 @@
               </div>
             </div>
             <div class="section-col">
-              ${buildCostCard(cost, config)}
+              ${buildRangeSafetyDiagnosticsCard(monthly, cost)}
               <div class="card">
                 <div class="card-title">
                   <span class="card-title-main">🌡️ 月均温度变化</span>
@@ -1467,7 +1467,8 @@
                   <canvas id="chartMonthlyTemp"></canvas>
                 </div>
               </div>
-              ${buildCarbonCard(cost)}
+              ${buildCostCard(cost, config)}
+              ${buildEnergyComparisonCard(monthly, cost)}
             </div>
           </div>
         `;
@@ -1513,10 +1514,10 @@
               </div>
             </div>
             <div class="section-col">
+              ${buildRangeSafetyDiagnosticsCard(daily, cost)}
+              ${buildRangeTimeOfDayCard(heatmap, config)}
               ${buildCostCard(cost, config)}
-              ${buildStandbyCard(standby)}
-              ${buildSavingROICard(standby, config)}
-              ${buildCarbonCard(cost)}
+              ${buildEnergyComparisonCard(daily, cost)}
             </div>
           </div>
         `;
@@ -1842,18 +1843,19 @@
   }
   
   function buildCostCard(cost, config) {
+    const isRealTou = config.is_tou && config.peak_rate !== config.valley_rate;
     return `
       <div class="card">
         <div class="card-title">
           <span class="card-title-main">💰 产生费用账单</span>
-          <span class="badge">${cost.is_tou ? '分时电费' : '标准统一'}</span>
+          <span class="badge">${isRealTou ? '分时电费' : '标准单电价'}</span>
         </div>
         <div class="cost-big">
           <div class="cost-label">累计产生电费 (${cost.days_covered || 0} 天)</div>
           <div class="cost-value font-title font-mono">${fmtYuan(cost.total_cost)}</div>
         </div>
         <div class="cost-grid">
-          ${cost.is_tou ? `
+          ${isRealTou ? `
           <div class="cost-item">
             <span class="cost-label">峰段用电 (单价 ${config.peak_rate}元)</span>
             <span class="cost-value font-mono">${fmt(cost.peak_kwh, 3)}<span class="stat-unit">kWh</span></span>
@@ -1864,192 +1866,571 @@
           </div>
           ` : `
           <div class="cost-item">
-            <span class="cost-label">累计耗能电量</span>
+            <span class="cost-label">累计消耗电量</span>
             <span class="cost-value font-mono">${fmt(cost.total_kwh, 3)}<span class="stat-unit">kWh</span></span>
           </div>
           <div class="cost-item">
-            <span class="cost-label">单价价格</span>
+            <span class="cost-label">标准单价</span>
             <span class="cost-value font-mono">${config.electricity_rate}<span class="stat-unit">元/度</span></span>
           </div>
           `}
           <div class="cost-item">
-            <span class="cost-label">日均开销费用</span>
+            <span class="cost-label">日均费用开销</span>
             <span class="cost-value font-mono">${fmtYuan(cost.daily_avg_cost)}</span>
           </div>
           <div class="cost-item">
-            <span class="cost-label">30日运行速率</span>
+            <span class="cost-label">30日费用预估</span>
             <span class="cost-value font-mono">${fmtYuan((cost.daily_avg_cost || 0) * 30)}</span>
           </div>
         </div>
       </div>
     `;
   }
-  
-  function buildStandbyCard(standby) {
-    return `
-      <div class="card">
-        <div class="card-title">
-          <span class="card-title-main">💤 设备待机分析</span>
-          <span class="badge">&lt; ${standby.threshold_w || 5}W</span>
-        </div>
-        <div class="standby-header">
-          <span class="cost-label">待机低功耗覆盖比例</span>
-          <span class="insight-value font-title font-mono standby-val">${fmt(standby.standby_pct, 0)}%</span>
-        </div>
-        <div class="standby-bar">
-          <div class="standby-fill" style="width:${clamp(standby.standby_pct)}%"></div>
-        </div>
-        <div class="insight-caption">
-          待机平均功率: ${fmt(standby.avg_standby_w)}W<br>
-          待机损耗电量: ${fmt(standby.standby_kwh, 3)} kWh<br>
-          符合采样计点: ${fmt(standby.standby_points, 0)} 点样本
-        </div>
-      </div>
-    `;
-  }
 
-  // 🍃 新增：低碳环保卡片
-  function buildCarbonCard(cost) {
-    const kwh = cost.total_kwh || 0;
-    const co2 = kwh * 0.570; // 1 kWh ≈ 0.57 kg CO2
-    const coal = kwh * 0.220; // 1 kWh ≈ 0.22 kg 标煤
-    const tree = co2 / 18.3;  // 1棵树年吸收约18.3kg CO2
+  // 1. 设备运行状态时序日志 (今日视图)
+  function buildDeviceEventLogCard(readings, config) {
+    if (!readings || !readings.length) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">📋 设备运行状态日志</span>
+            <span class="badge">状态流转</span>
+          </div>
+          <div class="insight-caption">今日暂无运行数据。</div>
+        </div>
+      `;
+    }
+
+    const threshold = config.standby_threshold || 5;
+    const events = [];
     
+    // State definitions:
+    // 0: OFFLINE
+    // 1: POWER_OFF (relay off)
+    // 2: STANDBY (on, < threshold)
+    // 3: RUNNING (on, >= threshold)
+    const getState = (r) => {
+      if (!r.reachable) return 0;
+      if (!r.power_on) return 1;
+      if (r.power_w < threshold) return 2;
+      return 3;
+    };
+
+    const stateNames = {
+      0: '网络离线',
+      1: '继电器关闭',
+      2: '设备待机',
+      3: '负载工作运行'
+    };
+
+    const stateColors = {
+      0: '#ef4444',
+      1: '#94a3b8',
+      2: '#f59e0b',
+      3: '#10b981'
+    };
+
+    const stateIcons = {
+      0: '🔴',
+      1: '⚪',
+      2: '💤',
+      3: '⚡'
+    };
+
+    const sorted = [...readings].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    let currentEvent = null;
+    
+    for (let i = 0; i < sorted.length; i++) {
+      const r = sorted[i];
+      const state = getState(r);
+      const time = new Date(r.timestamp);
+      
+      if (!currentEvent) {
+        currentEvent = {
+          state,
+          startTime: time,
+          endTime: time,
+          powerSum: r.power_w || 0,
+          powerCount: r.power_w != null ? 1 : 0
+        };
+      } else if (currentEvent.state === state) {
+        currentEvent.endTime = time;
+        if (r.power_w != null) {
+          currentEvent.powerSum += r.power_w;
+          currentEvent.powerCount++;
+        }
+      } else {
+        events.push(currentEvent);
+        currentEvent = {
+          state,
+          startTime: time,
+          endTime: time,
+          powerSum: r.power_w || 0,
+          powerCount: r.power_w != null ? 1 : 0
+        };
+      }
+    }
+    
+    if (currentEvent) {
+      events.push(currentEvent);
+    }
+
+    const displayEvents = events.reverse().slice(0, 6);
+    
+    const formatDuration = (ms) => {
+      const secs = Math.floor(ms / 1000);
+      if (secs < 60) return `${secs}秒`;
+      const mins = Math.floor(secs / 60);
+      if (mins < 60) return `${mins}分钟`;
+      const hrs = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      return `${hrs}小时${remMins}分钟`;
+    };
+
+    const listHtml = displayEvents.map(ev => {
+      const icon = stateIcons[ev.state];
+      const name = stateNames[ev.state];
+      const color = stateColors[ev.state];
+      const durationStr = formatDuration(ev.endTime - ev.startTime);
+      const startStr = ev.startTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      
+      let detail = '';
+      if (ev.state === 3 && ev.powerCount > 0) {
+        detail = ` · 均值 ${fmt(ev.powerSum / ev.powerCount, 1)} W`;
+      } else if (ev.state === 2 && ev.powerCount > 0) {
+        detail = ` · 待机 ${fmt(ev.powerSum / ev.powerCount, 1)} W`;
+      }
+
+      return `
+        <div style="display: flex; align-items: flex-start; gap: 10px; font-size: 0.82rem; padding: 8px 0; border-bottom: 1px dashed var(--border-color);">
+          <span style="font-size: 1rem; line-height: 1;">${icon}</span>
+          <div style="flex-grow: 1;">
+            <div style="display: flex; justify-content: space-between; font-weight: 700;">
+              <span style="color: ${color};">${name}</span>
+              <span class="font-mono" style="color: var(--text-secondary);">${startStr}</span>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 2px;">
+              持续: ${durationStr}${detail}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
     return `
       <div class="card">
         <div class="card-title">
-          <span class="card-title-main">🍃 绿色低碳与环保指标</span>
-          <span class="badge">低碳节能</span>
+          <span class="card-title-main">📋 设备运行状态日志</span>
+          <span class="badge">今日流转</span>
         </div>
-        <div style="margin-bottom: 12px;">
-          <span class="cost-label">累计产生的二氧化碳排放量</span>
-          <div class="cost-value font-title font-mono" style="color:var(--success-color); font-size: 1.95rem;">
-            ${fmt(co2, 2)} <span style="font-size: 0.9rem; font-weight: 700;">kg</span>
-          </div>
+        <div style="display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; scrollbar-width: none;">
+          ${listHtml || '<div class="insight-caption">暂无状态流转记录。</div>'}
         </div>
-        <div class="status-list" style="gap: 8px;">
-          <div class="status-item" style="padding-bottom: 6px;">
-            <span class="lbl">等效标准煤消耗</span>
-            <span class="val font-mono">${fmt(coal, 2)} kg</span>
-          </div>
-          <div class="status-item" style="padding-bottom: 0px; border-bottom: none;">
-            <span class="lbl">等效植树固碳量</span>
-            <span class="val font-mono">🌲 约 ${fmt(tree, 1)} 棵树/年</span>
-          </div>
+        <div class="insight-caption" style="margin-top: 10px; font-size: 0.7rem; color: var(--text-secondary);">
+          💡 通过实时功率特征，系统对电器工作事件及插座 Wi-Fi 连通性进行流式审计。
         </div>
       </div>
     `;
   }
 
-  // ⏰ 新增：日用电负荷高峰时段分析
-  function buildPeakHourCard(hourly) {
+  // 2. 插座发热与电力安全诊断卡 (今日视图)
+  function buildSafetyDiagnosticsCard(readings, stats, peak) {
+    if (!readings || !readings.length) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">🛡️ 电力安全与发热诊断</span>
+            <span class="badge">今日</span>
+          </div>
+          <div class="insight-caption">暂无数据。</div>
+        </div>
+      `;
+    }
+
+    let score = 100;
+    const warnings = [];
+    const maxTemp = stats.max_temp || 0;
+    const maxPower = stats.max_power || 0;
+
+    if (maxTemp > 65) {
+      score -= 40;
+      warnings.push(`🚨 <b>温度极端过热</b>：外壳最高温达 <b>${maxTemp}°C</b>！已超出安全红线，请立刻断电排查！`);
+    } else if (maxTemp > 55) {
+      score -= 20;
+      warnings.push(`⚠️ <b>外壳温度偏高</b>：最高工作温达 <b>${maxTemp}°C</b>，建议改善周边散热或检查负荷。`);
+    } else if (maxTemp > 48) {
+      score -= 5;
+      warnings.push(`温升提示：运行最高温 <b>${maxTemp}°C</b>，属于轻微正常热聚集范围。`);
+    }
+
+    // 接触发热诊断 (Contact Resistance Diagnosis):
+    // 功率很低时温度仍超过 48°C
+    const contactRiskCount = readings.filter(r => r.reachable && r.power_on && r.power_w > 1 && r.power_w < 25 && r.temperature > 48).length;
+    if (contactRiskCount > 5) {
+      score -= 20;
+      warnings.push(`⚠️ <b>接触发热预警</b>：检测到设备低负荷运行（功率 &lt; 25W）时，插头温度多次超过 48°C。极可能是插针与铜片**接触不良/接触电阻过高**导致的局部异常发热，建议重新插拔或检查插座孔磨损。`);
+    }
+
+    const limitW = 2200;
+    if (maxPower > limitW) {
+      score -= 30;
+      warnings.push(`🚨 <b>电力负荷超载</b>：今日最高负载达 <b>${maxPower} W</b>，已超出本插座 2200W(10A) 额定安全负荷！`);
+    } else if (maxPower > limitW * 0.85) {
+      score -= 10;
+      warnings.push(`⚠️ <b>负荷接近上限</b>：最高负载 <b>${maxPower} W</b> 已超出额定容量的 85%，防范多设备同时启动。`);
+    }
+
+    const uptime = stats.uptime_pct ?? 100;
+    if (uptime < 85) {
+      score -= 15;
+      warnings.push(`⚠️ <b>Wi-Fi 频繁离线</b>：在线率仅 <b>${fmt(uptime, 0)}%</b>，插座通信连通性低，可能产生观测断截。`);
+    } else if (uptime < 96) {
+      score -= 5;
+      warnings.push(`网络提示：今日有轻度丢包，在线率为 ${fmt(uptime, 0)}%。`);
+    }
+
+    score = Math.max(0, score);
+    
+    let scoreColor = 'var(--success-color)';
+    let scoreBg = 'rgba(16, 185, 129, 0.12)';
+    if (score < 70) {
+      scoreColor = 'var(--error-color)';
+      scoreBg = 'rgba(239, 68, 68, 0.12)';
+    } else if (score < 90) {
+      scoreColor = 'var(--warning-color)';
+      scoreBg = 'rgba(245, 158, 11, 0.12)';
+    }
+
+    const warningsHtml = warnings.map(w => `<div style="margin-bottom: 6px; font-size: 0.75rem; line-height: 1.4;">${w}</div>`).join('');
+
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">🛡️ 电力安全与发热诊断</span>
+          <span class="badge" style="background:${scoreBg}; color:${scoreColor}; border: none;">安全得分 ${score}</span>
+        </div>
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 12px;">
+          <div style="width: 58px; height: 58px; border-radius: 50%; border: 3px solid ${scoreColor}; display: grid; place-items: center; font-size: 1.2rem; font-weight: 800; font-family: var(--font-title); color: ${scoreColor}; flex-shrink: 0; background: ${scoreBg};">
+            ${score}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.35;">
+            基于实时功耗负荷率、工作温升斜率、电网接触电阻迹象及通信丢失率进行动态诊断。
+          </div>
+        </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+          ${warningsHtml || '<div style="font-size: 0.75rem; color: var(--success-color);">✅ 插座安全指标均处于极佳区间，负荷温升正常。</div>'}
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. 今日时段用能占比分配 (今日视图)
+  function buildTimeOfDayEnergyCard(hourly) {
     if (!hourly || !hourly.length) {
       return `
         <div class="card">
           <div class="card-title">
-            <span class="card-title-main">⏰ 负荷高峰时段</span>
-            <span class="badge">无样本</span>
+            <span class="card-title-main">🕒 今日用能时段分配</span>
+            <span class="badge">今日</span>
           </div>
-          <div class="insight-caption">暂无今日负荷采样，无法分析高峰期。</div>
+          <div class="insight-caption">暂无时段分布。</div>
         </div>
       `;
     }
-    
-    let maxHour = -1;
-    let maxVal = -1;
+
+    let nightW = 0, morningW = 0, afternoonW = 0, eveningW = 0;
     hourly.forEach(h => {
-      if (h.avg_w > maxVal) {
-        maxVal = h.avg_w;
-        const parts = h.hour_key.split(' ');
-        const hourStr = parts.length > 1 ? parts[1] : h.hour_key;
-        maxHour = parseInt(hourStr);
+      const parts = h.hour_key.split(' ');
+      const hourStr = parts.length > 1 ? parts[1] : h.hour_key;
+      const hour = parseInt(hourStr);
+      const w = h.avg_w || 0;
+
+      if (hour >= 0 && hour < 6) {
+        nightW += w;
+      } else if (hour >= 6 && hour < 12) {
+        morningW += w;
+      } else if (hour >= 12 && hour < 18) {
+        afternoonW += w;
+      } else {
+        eveningW += w;
       }
     });
-    
-    if (maxHour === -1 || maxVal < 1) {
+
+    const totalWh = nightW + morningW + afternoonW + eveningW;
+    const pct = (val) => totalWh > 0 ? (val / totalWh * 100) : 0;
+    const toKwhStr = (wh) => fmt(wh / 1000, 3) + ' kWh';
+
+    const sections = [
+      { label: '🌌 深夜 (00:00 - 06:00)', wh: nightW, pct: pct(nightW), color: '#38bdf8' },
+      { label: '🌅 上午 (06:00 - 12:00)', wh: morningW, pct: pct(morningW), color: '#fbbf24' },
+      { label: '☀️ 下午 (12:00 - 18:00)', wh: afternoonW, pct: pct(afternoonW), color: '#0284c7' },
+      { label: '🌃 晚上 (18:00 - 24:00)', wh: eveningW, pct: pct(eveningW), color: '#f43f5e' }
+    ];
+
+    let dominant = sections[0];
+    sections.forEach(s => { if (s.pct > dominant.pct) dominant = s; });
+
+    const barsHtml = sections.map(s => {
       return `
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-main">⏰ 负荷高峰时段</span>
-            <span class="badge">待机中</span>
+        <div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;">
+            <span style="font-weight: 500;">${s.label}</span>
+            <span class="font-mono" style="font-weight: 700;">${fmt(s.pct, 1)}% (${toKwhStr(s.wh)})</span>
           </div>
-          <div class="insight-caption">设备今日主要处于关机或超低负载运行状态。</div>
+          <div style="height: 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
+            <div style="height: 100%; border-radius: 99px; width: ${s.pct}%; background: ${s.color};"></div>
+          </div>
         </div>
       `;
+    }).join('');
+
+    let advice = '';
+    if (dominant.label.includes('深夜') && dominant.pct > 30) {
+      advice = `💡 用电时段提示：<b>深夜段耗电占比偏高</b> (${fmt(dominant.pct, 0)}%)。如果电器在夜间无需工作，建议配置智能定时断电。`;
+    } else {
+      advice = `💡 用电时段提示：主要能耗集中在 <b>${dominant.label.substring(2, dominant.label.indexOf('(')).trim()}</b> 阶段 (${fmt(dominant.pct, 0)}%)，工作用电规律表现良好。`;
     }
-    
-    const nextHour = (maxHour + 1) % 24;
-    const timeRange = `${String(maxHour).padStart(2, '0')}:00 ~ ${String(nextHour).padStart(2, '0')}:00`;
-    
+
     return `
       <div class="card">
         <div class="card-title">
-          <span class="card-title-main">⏰ 负荷高峰时段</span>
-          <span class="badge">用能特征</span>
+          <span class="card-title-main">🕒 今日用能时段分配</span>
+          <span class="badge">能耗分布</span>
         </div>
-        <div style="margin-bottom: 10px;">
-          <span class="cost-label">今日用电平均负荷最大时间段</span>
-          <div class="cost-value font-title font-mono" style="font-size: 1.65rem; color:var(--primary-color);">
-            ${timeRange}
-          </div>
+        <div>
+          ${barsHtml}
         </div>
-        <div class="insight-caption">
-          此高峰段内设备平均运行功率达 <b>${fmt(maxVal, 1)} W</b>，建议在此高峰时段合理规划大功率电器运转。
+        <div class="insight-caption" style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+          ${advice}
         </div>
       </div>
     `;
   }
 
-  // 💡 新增：待机节电ROI计算卡片
-  function buildSavingROICard(standby, config) {
-    if (!standby || !standby.standby_kwh || standby.standby_kwh < 0.001) {
+  // 4. 历史运行安全与稳定性 (Range/Year 视图)
+  function buildRangeSafetyDiagnosticsCard(daily, cost) {
+    if (!daily || !daily.length) {
       return `
         <div class="card">
           <div class="card-title">
-            <span class="card-title-main">💡 智能待机节电 ROI</span>
-            <span class="badge">电耗极低</span>
+            <span class="card-title-main">🛡️ 历史运行安全与连通性</span>
+            <span class="badge">历史</span>
           </div>
-          <div class="insight-caption">该插座在统计周期内未发生明显的待机电量损耗。</div>
+          <div class="insight-caption">暂无周期数据。</div>
         </div>
       `;
     }
+
+    const days = daily.length;
+    let score = 100;
+    const warnings = [];
+
+    const temps = daily.map(d => d.max_temp).filter(t => t != null);
+    const maxPeriodTemp = temps.length ? Math.max(...temps) : 0;
+    const highTempDays = daily.filter(d => d.max_temp > 55).length;
+
+    if (maxPeriodTemp > 65) {
+      score -= 35;
+      warnings.push(`🚨 <b>历史极端过热</b>：期间录得最高工作温度 <b>${maxPeriodTemp}°C</b>！已报警过热。`);
+    } else if (maxPeriodTemp > 55) {
+      score -= 15;
+      warnings.push(`⚠️ <b>持续发热天数</b>：${days}天观测内，有 <b>${highTempDays} 天</b> 工作最高温超过 55°C，属于发热集中状态。`);
+    }
+
+    const totalSamples = daily.reduce((sum, d) => sum + (d.total || 0), 0);
+    const offlineSamples = daily.reduce((sum, d) => sum + (d.unreachable || 0), 0);
+    const unreachablePct = totalSamples > 0 ? (offlineSamples / totalSamples * 100) : 0;
+
+    if (unreachablePct > 15) {
+      score -= 20;
+      warnings.push(`⚠️ <b>网络稳定性警告</b>：期间断连掉线占比 <b>${fmt(unreachablePct, 1)}%</b>，可能存在数据丢失。`);
+    } else if (unreachablePct > 2) {
+      score -= 5;
+      warnings.push(`通信提示：期间断连丢包率为 <b>${fmt(unreachablePct, 1)}%</b>。`);
+    }
+
+    const powers = daily.map(d => d.max_power).filter(p => p != null);
+    const maxPeriodPower = powers.length ? Math.max(...powers) : 0;
+    if (maxPeriodPower > 2200) {
+      score -= 25;
+      warnings.push(`🚨 <b>过载大功率记录</b>：历史极端负载达 <b>${maxPeriodPower} W</b>，已超载。`);
+    } else if (maxPeriodPower > 1800) {
+      score -= 8;
+      warnings.push(`⚠️ <b>接近历史满载</b>：最大功率负荷为 <b>${maxPeriodPower} W</b>，逼近安全边缘。`);
+    }
+
+    score = Math.max(0, score);
     
-    const rate = config.is_tou ? config.valley_rate : config.electricity_rate;
-    const dailyKwh = standby.standby_kwh;
-    const dailyCost = dailyKwh * rate;
-    const annualCost = dailyCost * 365;
-    const annualKwh = dailyKwh * 365;
-    
+    let scoreColor = 'var(--success-color)';
+    let scoreBg = 'rgba(16, 185, 129, 0.12)';
+    if (score < 70) {
+      scoreColor = 'var(--error-color)';
+      scoreBg = 'rgba(239, 68, 68, 0.12)';
+    } else if (score < 90) {
+      scoreColor = 'var(--warning-color)';
+      scoreBg = 'rgba(245, 158, 11, 0.12)';
+    }
+
+    const warningsHtml = warnings.map(w => `<div style="margin-bottom: 6px; font-size: 0.75rem; line-height: 1.4;">${w}</div>`).join('');
+
     return `
       <div class="card">
         <div class="card-title">
-          <span class="card-title-main">💡 智能待机节电 ROI</span>
-          <span class="badge">节电投资</span>
+          <span class="card-title-main">🛡️ 历史运行安全与连通性</span>
+          <span class="badge" style="background:${scoreBg}; color:${scoreColor}; border: none;">安全得分 ${score}</span>
         </div>
-        <div style="margin-bottom: 12px;">
-          <span class="cost-label">若通过自动定时任务切断待机电耗</span>
-          <div class="cost-value font-title font-mono" style="color:var(--success-color); font-size: 1.95rem;">
-            年均省 ${fmtYuan(annualCost)}
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 12px;">
+          <div style="width: 54px; height: 54px; border-radius: 50%; border: 3px solid ${scoreColor}; display: grid; place-items: center; font-size: 1.1rem; font-weight: 800; font-family: var(--font-title); color: ${scoreColor}; flex-shrink: 0; background: ${scoreBg};">
+            ${score}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.35;">
+            分析 <b>${days} 天</b> 统计覆盖周期内，是否存在设备过载冲击、插头热阻老化或网络连接劣化隐患。
           </div>
         </div>
-        <div class="status-list" style="gap: 8px;">
-          <div class="status-item" style="padding-bottom: 6px;">
-            <span class="lbl">预计每年节省电量</span>
-            <span class="val font-mono">${fmt(annualKwh, 1)} kWh</span>
-          </div>
-          <div class="status-item" style="padding-bottom: 0px; border-bottom: none;">
-            <span class="lbl">每日待机漏电费用</span>
-            <span class="val font-mono">${fmtYuan(dailyCost)} / 天</span>
-          </div>
-        </div>
-        <div class="insight-caption" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
-          💡 <b>优化配置建议</b>: 待机时间占比已达 <b>${fmt(standby.standby_pct, 0)}%</b>，可在插座设置中配置“夜间自动断电”或“定时开关”以完全消除漏电。
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+          ${warningsHtml || '<div style="font-size: 0.75rem; color: var(--success-color);">✅ 历史周期内，温度负荷率及网络稳定性皆保持全优，无接触热阻风险。</div>'}
         </div>
       </div>
     `;
   }
-  
-  // 图表配色获取
+
+  // 5. 长期时段用电特征还原 (Range 视图)
+  function buildRangeTimeOfDayCard(heatmap, config) {
+    if (!heatmap || !heatmap.length) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">🕒 历史时段能耗分配</span>
+            <span class="badge">累计</span>
+          </div>
+          <div class="insight-caption">无时段统计。</div>
+        </div>
+      `;
+    }
+
+    let nightW = 0, morningW = 0, afternoonW = 0, eveningW = 0;
+    heatmap.forEach(item => {
+      const hour = item.hour;
+      const w = item.avg_w || 0;
+      if (hour >= 0 && hour < 6) {
+        nightW += w;
+      } else if (hour >= 6 && hour < 12) {
+        morningW += w;
+      } else if (hour >= 12 && hour < 18) {
+        afternoonW += w;
+      } else {
+        eveningW += w;
+      }
+    });
+
+    const totalWh = nightW + morningW + afternoonW + eveningW;
+    const pct = (val) => totalWh > 0 ? (val / totalWh * 100) : 0;
+
+    const sections = [
+      { label: '🌌 深夜 (00:00 - 06:00)', pct: pct(nightW), color: '#38bdf8' },
+      { label: '🌅 上午 (06:00 - 12:00)', pct: pct(morningW), color: '#fbbf24' },
+      { label: '☀️ 下午 (12:00 - 18:00)', pct: pct(afternoonW), color: '#0284c7' },
+      { label: '🌃 晚上 (18:00 - 24:00)', pct: pct(eveningW), color: '#f43f5e' }
+    ];
+
+    let dominant = sections[0];
+    sections.forEach(s => { if (s.pct > dominant.pct) dominant = s; });
+
+    const barsHtml = sections.map(s => {
+      return `
+        <div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;">
+            <span style="font-weight: 500;">${s.label}</span>
+            <span class="font-mono" style="font-weight: 700;">${fmt(s.pct, 1)}%</span>
+          </div>
+          <div style="height: 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
+            <div style="height: 100%; border-radius: 99px; width: ${s.pct}%; background: ${s.color};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    let tip = '';
+    if (dominant.label.includes('深夜') && dominant.pct > 30) {
+      tip = `💡 历史用电特征：<b>深夜段耗能较高</b>。若设备存在不必要夜间耗电，建议配置定时关闭以降低损耗开支。`;
+    } else {
+      tip = `💡 历史用电特征：主要用电集中在 <b>${dominant.label.substring(2, dominant.label.indexOf('(')).trim()}</b> 阶段 (${fmt(dominant.pct, 0)}%)，用电特征与日常作息较为吻合。`;
+    }
+
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">🕒 历史时段能耗分配</span>
+          <span class="badge">时段占比</span>
+        </div>
+        <div>
+          ${barsHtml}
+        </div>
+        <div class="insight-caption" style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+          ${tip}
+        </div>
+      </div>
+    `;
+  }
+
+  // 新增 3：能耗周期环比对比卡片
+  function buildEnergyComparisonCard(daily, cost) {
+    if (!daily || daily.length < 2) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">📈 周期能耗环比分析</span>
+            <span class="badge">无对比</span>
+          </div>
+          <div class="insight-caption">需要至少两个时间周期的样本以计算用电量环比。</div>
+        </div>
+      `;
+    }
+    
+    const len = daily.length;
+    const half = Math.floor(len / 2);
+    const recent = daily.slice(len - half);
+    const older = daily.slice(0, len - half);
+    
+    const recentKwh = recent.reduce((sum, d) => sum + (d.kwh || 0), 0);
+    const olderKwh = older.reduce((sum, d) => sum + (d.kwh || 0), 0);
+    
+    let diffHtml = '';
+    let caption = '';
+    
+    if (olderKwh <= 0.001) {
+      diffHtml = '<span style="color: var(--text-secondary);">--</span>';
+      caption = '上一周期用电量接近零，暂无法获得可靠的环比波动趋势。';
+    } else {
+      const pct = (recentKwh - olderKwh) / olderKwh * 100;
+      if (pct >= 0) {
+        diffHtml = `<span style="color: var(--error-color);">+${fmt(pct, 1)}% 📈</span>`;
+        caption = `当前周期（近 ${recent.length} 天）较上一阶段用能<b>增加了 ${fmt(recentKwh - olderKwh, 2)} kWh</b>，用能有上升趋势。`;
+      } else {
+        diffHtml = `<span style="color: var(--success-color);">${fmt(pct, 1)}% 📉</span>`;
+        caption = `当前周期（近 ${recent.length} 天）较上一阶段用能<b>节省了 ${fmt(olderKwh - recentKwh, 2)} kWh</b>，节电效果开始显现。`;
+      }
+    }
+    
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">📈 周期能耗环比分析</span>
+          <span class="badge">用能趋势</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <span class="cost-label">相邻周期用电环比波动比例</span>
+          <div class="cost-value font-title font-mono" style="font-size: 1.95rem;">
+            ${diffHtml}
+          </div>
+        </div>
+        <div class="insight-caption">
+          ${caption}
+        </div>
+      </div>
+    `;
+  }
+  // 图表配色
   function chartColors() {
     const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     return {
