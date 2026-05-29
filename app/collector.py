@@ -15,6 +15,19 @@ from typing import Optional
 CST = timezone(timedelta(hours=8))
 log = logging.getLogger("power_monitor.collector")
 
+# 缓存 Device 连接，避免每次采集都创建新连接
+_device_cache: dict[str, object] = {}
+
+
+def _get_device(ip: str, token: str) -> object:
+    """获取或缓存的 Device 实例"""
+    from miio import Device
+    cache_key = f"{ip}:{token}"
+    if cache_key not in _device_cache:
+        _device_cache[cache_key] = Device(ip=ip, token=token, timeout=SOCKET_TIMEOUT)
+    return _device_cache[cache_key]
+
+
 # cuco.plug.v3 MIoT 属性
 PROPERTIES = [
     {"did": "power", "siid": 2, "piid": 1},
@@ -77,7 +90,7 @@ def collect_once(ip: str, token: str, model: str = "") -> dict:
 
     for attempt in range(MAX_RETRIES):
         try:
-            plug = Device(ip=ip, token=token, timeout=SOCKET_TIMEOUT)
+            plug = _get_device(ip, token)
             result = plug.send("get_properties", props)
             vals = {}
             for r in result:
@@ -102,6 +115,9 @@ def collect_once(ip: str, token: str, model: str = "") -> dict:
             }
         except Exception as e:
             log.warning(f"[{ip}] 采集失败 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}")
+            # 连接出错时清除缓存，下次重建
+            cache_key = f"{ip}:{token}"
+            _device_cache.pop(cache_key, None)
             if attempt < MAX_RETRIES - 1:
                 time.sleep(RETRY_DELAY)
 

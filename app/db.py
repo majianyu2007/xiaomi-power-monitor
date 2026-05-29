@@ -18,9 +18,10 @@ log = logging.getLogger("power_monitor.db")
 
 
 class PowerDB:
-    def __init__(self, db_path: str, collect_interval: int = 60):
+    def __init__(self, db_path: str, collect_interval: int = 60, retention_days: int = 90):
         self.db_path = db_path
         self.collect_interval = collect_interval  # 秒, 用于 kWh 计算
+        self.retention_days = retention_days
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._init_db()
 
@@ -230,22 +231,24 @@ class PowerDB:
         return [dict(r) for r in rows]
 
     def get_cost_estimate(self, device_id: str, days: int = 30,
-                          peak_rate: float = 0.56, valley_rate: float = 0.36) -> dict:
-        """电费估算 — timestamp 已是 CST，strftime('%H', timestamp) 直接取 CST 小时"""
+                          peak_rate: float = 0.56, valley_rate: float = 0.36,
+                          peak_start: int = 8, peak_end: int = 21) -> dict:
+        """电费估算 — timestamp 已是 CST，strftime('%H', timestamp) 直接取 CST 小时
+        peak_start/peak_end: 峰段起止小时 (含起不含终), 默认 8-21"""
         interval_hours = self.collect_interval / 3600.0
         with self._conn() as conn:
             row = conn.execute("""
                 SELECT
                     ROUND(SUM(
                         CASE
-                            WHEN CAST(strftime('%H', timestamp) AS INTEGER) BETWEEN 8 AND 21
+                            WHEN CAST(strftime('%H', timestamp) AS INTEGER) BETWEEN ? AND ?
                             AND reachable=1 AND power_w IS NOT NULL
                             THEN power_w ELSE 0
                         END
                     ) * ? / 1000.0, 4) as peak_kwh,
                     ROUND(SUM(
                         CASE
-                            WHEN CAST(strftime('%H', timestamp) AS INTEGER) NOT BETWEEN 8 AND 21
+                            WHEN CAST(strftime('%H', timestamp) AS INTEGER) NOT BETWEEN ? AND ?
                             AND reachable=1 AND power_w IS NOT NULL
                             THEN power_w ELSE 0
                         END
@@ -254,7 +257,9 @@ class PowerDB:
                     COUNT(DISTINCT DATE(timestamp)) as days_covered
                 FROM power_readings
                 WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
-            """, (interval_hours, interval_hours, interval_hours, device_id, f"-{days} days")).fetchone()
+            """, (peak_start, peak_end, interval_hours,
+                  peak_start, peak_end, interval_hours,
+                  interval_hours, device_id, f"-{days} days")).fetchone()
 
         if not row or row[2] is None:
             return {"total_kwh": 0, "peak_kwh": 0, "valley_kwh": 0,
@@ -347,3 +352,16 @@ class PowerDB:
             "multiplier": multiplier,
             "temperature": row[2],
         }
+
+    def purge_old(self) -> int:
+        """清理超过 retention_days 天的旧数据，返回删除行数"""
+        with self._conn() as conn:
+            cursor = conn.execute(
+                "DELETE FROM power_readings WHERE timestamp < datetime('now', ?, '+8 hours')",
+                (f"-{self.retention_days} days",),
+            )
+            deleted = cursor.rowcount
+            if deleted > 0:
+                log.info(f"已清理 {deleted} 条超过 {self.retention_days} 天的旧数据")
+                conn.execute("VACUUM")
+        return deleted

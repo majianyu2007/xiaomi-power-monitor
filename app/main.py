@@ -20,6 +20,7 @@ PLUG_IP = os.environ.get("PLUG_IP", "")
 PLUG_TOKEN = os.environ.get("PLUG_TOKEN", "")
 COLLECT_INTERVAL = max(int(os.environ.get("COLLECT_INTERVAL", "60")), 5)  # 最低5秒, 防止过快
 DB_PATH = os.environ.get("DB_PATH", "/data/power_data.db")
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "90"))  # 数据保留天数
 PORT = int(os.environ.get("PORT", "8080"))
 
 # 多设备配置: DEVICES_JSON = [{"id":"plug1",...}, ...]
@@ -30,6 +31,9 @@ DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "cuco.plug.v3")
 ELECTRICITY_RATE = float(os.environ.get("ELECTRICITY_RATE", "0.5109"))
 PEAK_RATE = float(os.environ["PEAK_RATE"]) if "PEAK_RATE" in os.environ else None
 VALLEY_RATE = float(os.environ["VALLEY_RATE"]) if "VALLEY_RATE" in os.environ else None
+# 峰谷时段：默认 8:00-21:59 为峰段，其余为谷段
+PEAK_HOURS_START = int(os.environ.get("PEAK_HOURS_START", "8"))
+PEAK_HOURS_END = int(os.environ.get("PEAK_HOURS_END", "21"))
 STANDBY_THRESHOLD = float(os.environ.get("STANDBY_THRESHOLD", "5.0"))
 
 logging.basicConfig(
@@ -38,7 +42,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("power_monitor")
 
-db = PowerDB(DB_PATH, collect_interval=COLLECT_INTERVAL)
+db = PowerDB(DB_PATH, collect_interval=COLLECT_INTERVAL, retention_days=RETENTION_DAYS)
 
 # ============ 设备管理 ============
 
@@ -113,6 +117,11 @@ async def lifespan(app: FastAPI):
             name="功率采集",
             max_instances=1,
         )
+        # 每天凌晨4点自动清理旧数据 (RETENTION_DAYS=0 时跳过)
+        if RETENTION_DAYS > 0:
+            scheduler.add_job(
+                db.purge_old, "cron", hour=4, minute=0, id="db_purge", name="数据清理"
+            )
         collect_and_store()
         scheduler.start()
         log.info(f"调度器已启动，采集间隔 {COLLECT_INTERVAL}s，共 {len(devices_config)} 个设备")
@@ -182,7 +191,8 @@ def api_cost(device_id: str, days: int = 30):
     else:
         peak, valley = ELECTRICITY_RATE, ELECTRICITY_RATE
         is_tou = False
-    result = db.get_cost_estimate(device_id, days=days, peak_rate=peak, valley_rate=valley)
+    result = db.get_cost_estimate(device_id, days=days, peak_rate=peak, valley_rate=valley,
+                                    peak_start=PEAK_HOURS_START, peak_end=PEAK_HOURS_END)
     result["flat_rate"] = ELECTRICITY_RATE
     result["is_tou"] = is_tou
     return result
@@ -207,6 +217,8 @@ def api_config():
         "is_tou": PEAK_RATE is not None and VALLEY_RATE is not None,
         "standby_threshold": STANDBY_THRESHOLD,
         "collect_interval": COLLECT_INTERVAL,
+        "peak_hours_start": PEAK_HOURS_START,
+        "peak_hours_end": PEAK_HOURS_END,
         "devices": [{"id": d["id"], "name": d.get("name", d["id"])}
                      for d in devices_config],
     }
