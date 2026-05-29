@@ -380,14 +380,19 @@ function renderAll(latest, today, readings, hourly, daily, heatmap, cost, standb
 
       <!-- Cost -->
       <div class="card">
-        <div class="card-title">💰 电费估算 <span class="badge" style="background:var(--accent-light);color:var(--accent-text)">${config.peak_rate || '?'}元/峰 · ${config.valley_rate || '?'}元/谷</span></div>
+        <div class="card-title">💰 电费估算 <span class="badge" style="background:var(--accent-light);color:var(--accent-text)">${cost.is_tou ? `${config.peak_rate}元/峰 · ${config.valley_rate}元/谷` : `${config.electricity_rate}元/度`}</span></div>
         <div class="cost-big">
           <div class="cost-label">累计电费 (近${cost.days_covered || 0}天)</div>
           <div class="cost-value">${fmtYuan(cost.total_cost)}</div>
         </div>
         <div class="cost-grid" style="margin-top:10px">
+          ${cost.is_tou ? `
           <div class="cost-item"><div class="cost-label">峰段用电</div><div class="cost-value">${fmt(cost.peak_kwh,3)}<span class="stat-unit">kWh</span></div></div>
           <div class="cost-item"><div class="cost-label">谷段用电</div><div class="cost-value">${fmt(cost.valley_kwh,3)}<span class="stat-unit">kWh</span></div></div>
+          ` : `
+          <div class="cost-item"><div class="cost-label">累计用电</div><div class="cost-value">${fmt(cost.total_kwh,3)}<span class="stat-unit">kWh</span></div></div>
+          <div class="cost-item"><div class="cost-label">单价</div><div class="cost-value">${config.electricity_rate}<span class="stat-unit">元/度</span></div></div>
+          `}
           <div class="cost-item"><div class="cost-label">日均电费</div><div class="cost-value">${fmtYuan(cost.daily_avg_cost)}</div></div>
         </div>
       </div>

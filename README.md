@@ -67,8 +67,9 @@ python3 -m micloud
 | `DB_PATH` | `/data/power_data.db` | 数据库路径 |
 | `PORT` | `8080` | Web 服务端口 |
 | `DEFAULT_MODEL` | `cuco.plug.v3` | 默认设备型号 |
-| `PEAK_RATE` | `0.56` | 峰段电价 (元/kWh) |
-| `VALLEY_RATE` | `0.36` | 谷段电价 (元/kWh) |
+| `ELECTRICITY_RATE` | `0.5109` | 统一电价 (元/kWh) |
+| `PEAK_RATE` | 空 | 峰段电价（设置后启用分时计价） |
+| `VALLEY_RATE` | 空 | 谷段电价（设置后启用分时计价） |
 | `STANDBY_THRESHOLD` | `5` | 待机功率阈值 (W) |
 
 ## 🏗️ 架构

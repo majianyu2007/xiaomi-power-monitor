@@ -27,8 +27,9 @@ DEVICES_JSON = os.environ.get("DEVICES_JSON", "")
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "cuco.plug.v3")
 
 # 电价配置 (居民阶梯/峰谷)
-PEAK_RATE = float(os.environ.get("PEAK_RATE", "0.56"))
-VALLEY_RATE = float(os.environ.get("VALLEY_RATE", "0.36"))
+ELECTRICITY_RATE = float(os.environ.get("ELECTRICITY_RATE", "0.5109"))
+PEAK_RATE = float(os.environ["PEAK_RATE"]) if "PEAK_RATE" in os.environ else None
+VALLEY_RATE = float(os.environ["VALLEY_RATE"]) if "VALLEY_RATE" in os.environ else None
 STANDBY_THRESHOLD = float(os.environ.get("STANDBY_THRESHOLD", "5.0"))
 
 logging.basicConfig(
@@ -174,8 +175,12 @@ def api_heatmap(device_id: str, days: int = 14):
 
 @app.get("/api/stats/{device_id}/cost")
 def api_cost(device_id: str, days: int = 30):
-    return db.get_cost_estimate(device_id, days=days,
-                                peak_rate=PEAK_RATE, valley_rate=VALLEY_RATE)
+    peak = PEAK_RATE if PEAK_RATE else ELECTRICITY_RATE
+    valley = VALLEY_RATE if VALLEY_RATE else ELECTRICITY_RATE
+    result = db.get_cost_estimate(device_id, days=days, peak_rate=peak, valley_rate=valley)
+    result["flat_rate"] = ELECTRICITY_RATE
+    result["is_tou"] = bool(PEAK_RATE or VALLEY_RATE)  # 分时电价?
+    return result
 
 
 @app.get("/api/stats/{device_id}/standby")
@@ -191,8 +196,10 @@ def api_peak(device_id: str):
 @app.get("/api/config")
 def api_config():
     return {
-        "peak_rate": PEAK_RATE,
-        "valley_rate": VALLEY_RATE,
+        "electricity_rate": ELECTRICITY_RATE,
+        "peak_rate": PEAK_RATE or None,
+        "valley_rate": VALLEY_RATE or None,
+        "is_tou": bool(PEAK_RATE or VALLEY_RATE),
         "standby_threshold": STANDBY_THRESHOLD,
         "collect_interval": COLLECT_INTERVAL,
         "devices": [{"id": d["id"], "name": d.get("name", d["id"])}
