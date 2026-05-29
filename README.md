@@ -1,20 +1,26 @@
 # ⚡ 小米智能插座 功耗监控
 
-类 SmokePing 风格的实时功耗监控面板，Material Design 3 深色主题。
+类 SmokePing 风格的实时功耗监控面板，自动适配系统主题（浅色/深色/跟随系统）。
 
-支持多插座同时监控，设备不可达时优雅降级（标记为 offline，不刷日志）。
+支持多插座同时监控，设备不可达时优雅降级。
 
-![Dashboard Preview](https://img.shields.io/badge/MD3-暗色主题-9c27b0?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-3776ab?style=flat-square)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ed?style=flat-square)
 
 ## 🌟 功能
 
 - ⚡ 每分钟采集实时功率 (W)、温度 (°C)、开关状态
-- 📊 今日分钟级实时曲线 + 24h min/avg/max 柱状图 + 7天 kWh 趋势
-- 🌡️ 插头温度趋势追踪
+- 📊 今日分钟级实时功率曲线
+- 📈 24h min/avg/max 柱状图（SmokePing 风格）
+- 🌡️ 功率热力图（近14天，行=天 列=小时）
+- 📅 7天用电趋势 (kWh)
+- 💰 峰谷分时电费估算（默认陕西居民电价）
+- 💤 待机功耗检测与占比统计
+- ⚡ 今日峰值标注（倍率对比均值）
+- 🌡️ 插头温度趋势
 - 🔌 **多插座支持** — 一个面板监控所有插座
-- 📱 响应式 MD3 深色 UI
+- 🎨 **三档主题** — 浅色 / 深色 / 跟随系统，一键切换
+- 📱 **响应式布局** — 手机 / 平板 / 桌面自适应
 - 🐳 Docker Compose 一键部署
 - 💾 SQLite 持久化（Docker Volume）
 
@@ -42,8 +48,13 @@ DEVICES_JSON=[{"id":"plug1","name":"书桌插座","model":"cuco.plug.v3","ip":"1
 
 ### 获取 Token
 
-1. 打开 https://miio2.miio.link 或 https://xiaomi-iot-token.vercel.app
-2. 用小米账号登录，即可看到所有设备的 Token
+使用 [Xiaomi-cloud-tokens-extractor](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor) 获取设备 Token：
+
+```bash
+pip install micloud
+python3 -m micloud
+# 按提示登录小米账号，即可看到所有设备的 IP 和 Token
+```
 
 ## ⚙️ 配置
 
@@ -56,6 +67,9 @@ DEVICES_JSON=[{"id":"plug1","name":"书桌插座","model":"cuco.plug.v3","ip":"1
 | `DB_PATH` | `/data/power_data.db` | 数据库路径 |
 | `PORT` | `8080` | Web 服务端口 |
 | `DEFAULT_MODEL` | `cuco.plug.v3` | 默认设备型号 |
+| `PEAK_RATE` | `0.56` | 峰段电价 (元/kWh) |
+| `VALLEY_RATE` | `0.36` | 谷段电价 (元/kWh) |
+| `STANDBY_THRESHOLD` | `5` | 待机功率阈值 (W) |
 
 ## 🏗️ 架构
 
@@ -69,8 +83,8 @@ DEVICES_JSON=[{"id":"plug1","name":"书桌插座","model":"cuco.plug.v3","ip":"1
                               └──────┬───────┘
                                      │
 ┌─────────────┐    每30s刷新  ┌──────▼───────┐
-│  MD3 前端    │◄────────────│   FastAPI      │
-│  (index.html) │────────────►│   REST API    │
+│  响应式前端  │◄────────────│   FastAPI      │
+│  (主题切换)  │────────────►│   REST API    │
 └─────────────┘             └──────────────┘
 ```
 

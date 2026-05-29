@@ -1,6 +1,6 @@
 """
 小米智能插座 功耗监控 - 数据库层 (多设备版)
-SQLite 持久化，支持多插座同时监控
+支持: 热力图、峰谷电费、待机检测、异常标注
 """
 
 import sqlite3
@@ -56,9 +56,7 @@ class PowerDB:
                     power_consumption INTEGER
                 )
             """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ts ON power_readings(timestamp)
-            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ts ON power_readings(timestamp)")
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_device_ts
                 ON power_readings(device_id, timestamp)
@@ -97,7 +95,7 @@ class PowerDB:
             )
         return ts
 
-    # ---- Queries ----
+    # ---- Basic Queries ----
 
     def get_latest(self, device_id: str) -> dict | None:
         with self._conn() as conn:
@@ -149,6 +147,17 @@ class PowerDB:
             """, (device_id, f"{today}%")).fetchall()
         return [dict(r) for r in rows]
 
+    def get_uptime_today(self, device_id: str) -> float:
+        today = datetime.now(CST).strftime("%Y-%m-%d")
+        with self._conn() as conn:
+            row = conn.execute("""
+                SELECT
+                    ROUND(SUM(CASE WHEN reachable=1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as uptime_pct
+                FROM power_readings
+                WHERE device_id=? AND timestamp LIKE ?
+            """, (device_id, f"{today}%")).fetchone()
+            return row[0] if row and row[0] is not None else 0.0
+
     def get_hourly_stats(self, device_id: str, days: int = 2) -> list[dict]:
         with self._conn() as conn:
             rows = conn.execute("""
@@ -186,13 +195,139 @@ class PowerDB:
             """, (device_id, f"-{days} days")).fetchall()
         return [dict(r) for r in rows]
 
-    def get_uptime_today(self, device_id: str) -> float:
-        today = datetime.now(CST).strftime("%Y-%m-%d")
+    # ---- Advanced Queries ----
+
+    def get_heatmap_data(self, device_id: str, days: int = 14) -> list[dict]:
+        """功率热力图: 每格 = 1小时内的平均功率, rows=天数, cols=24小时"""
+        with self._conn() as conn:
+            rows = conn.execute("""
+                SELECT
+                    DATE(timestamp, '+8 hours') as day,
+                    CAST(strftime('%H', timestamp, '+8 hours') AS INTEGER) as hour,
+                    ROUND(AVG(CASE WHEN reachable=1 THEN power_w ELSE NULL END), 1) as avg_w,
+                    MAX(CASE WHEN reachable=1 THEN power_w ELSE NULL END) as max_w,
+                    COUNT(CASE WHEN reachable=1 THEN 1 END) as samples,
+                    SUM(CASE WHEN reachable=0 THEN 1 ELSE 0 END) as offline
+                FROM power_readings
+                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+                GROUP BY day, hour
+                ORDER BY day, hour
+            """, (device_id, f"-{days} days")).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_cost_estimate(self, device_id: str, days: int = 30,
+                          peak_rate: float = 0.56, valley_rate: float = 0.36) -> dict:
+        """电费估算: 峰谷分时计价"""
         with self._conn() as conn:
             row = conn.execute("""
                 SELECT
-                    ROUND(SUM(CASE WHEN reachable=1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as uptime_pct
+                    ROUND(SUM(
+                        CASE
+                            WHEN CAST(strftime('%H', timestamp, '+8 hours') AS INTEGER) BETWEEN 8 AND 21
+                            THEN power_w ELSE 0
+                        END
+                    ) / 60.0 / 1000.0, 4) as peak_kwh,
+                    ROUND(SUM(
+                        CASE
+                            WHEN CAST(strftime('%H', timestamp, '+8 hours') AS INTEGER) NOT BETWEEN 8 AND 21
+                            THEN power_w ELSE 0
+                        END
+                    ) / 60.0 / 1000.0, 4) as valley_kwh,
+                    ROUND(SUM(CASE WHEN reachable=1 AND power_on=1 THEN power_w END) / 60.0 / 1000.0, 4) as total_kwh,
+                    COUNT(DISTINCT DATE(timestamp, '+8 hours')) as days_covered
                 FROM power_readings
-                WHERE device_id=? AND timestamp LIKE ?
+                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+            """, (device_id, f"-{days} days")).fetchone()
+
+        if not row or row[2] is None:
+            return {"total_kwh": 0, "peak_kwh": 0, "valley_kwh": 0,
+                    "peak_cost": 0, "valley_cost": 0, "total_cost": 0, "daily_avg_cost": 0, "days_covered": 0}
+
+        peak_kwh = row[0] or 0
+        valley_kwh = row[1] or 0
+        total_kwh = row[2] or 0
+        days_covered = row[3] or 1
+
+        peak_cost = round(peak_kwh * peak_rate, 2)
+        valley_cost = round(valley_kwh * valley_rate, 2)
+        total_cost = round(peak_cost + valley_cost, 2)
+        daily_avg_cost = round(total_cost / max(days_covered, 1), 2)
+
+        return {
+            "total_kwh": round(total_kwh, 4),
+            "peak_kwh": round(peak_kwh, 4),
+            "valley_kwh": round(valley_kwh, 4),
+            "peak_cost": peak_cost,
+            "valley_cost": valley_cost,
+            "total_cost": total_cost,
+            "daily_avg_cost": daily_avg_cost,
+            "days_covered": days_covered,
+            "peak_rate": peak_rate,
+            "valley_rate": valley_rate,
+        }
+
+    def get_standby_stats(self, device_id: str, threshold_w: float = 5.0) -> dict:
+        """待机检测: ON 但功率低于阈值的统计"""
+        with self._conn() as conn:
+            row = conn.execute("""
+                SELECT
+                    SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w < ? THEN 1 ELSE 0 END) as standby_points,
+                    SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w >= ? THEN 1 ELSE 0 END) as active_points,
+                    ROUND(SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w < ? THEN power_w END) / 60.0 / 1000.0, 4) as standby_kwh,
+                    ROUND(AVG(CASE WHEN reachable=1 AND power_on=1 AND power_w < ? THEN power_w END), 1) as avg_standby_w,
+                    COUNT(*) as total
+                FROM power_readings
+                WHERE device_id=?
+            """, (threshold_w, threshold_w, threshold_w, threshold_w, device_id)).fetchone()
+
+        if not row:
+            return {"standby_points": 0, "active_points": 0, "standby_kwh": 0,
+                    "avg_standby_w": 0, "standby_pct": 0, "threshold_w": threshold_w}
+
+        standby_points = row[0] or 0
+        active_points = row[1] or 0
+        total = row[4] or 1
+        standby_kwh = row[2] or 0
+        avg_standby_w = row[3] or 0
+
+        return {
+            "standby_points": standby_points,
+            "active_points": active_points,
+            "standby_kwh": round(standby_kwh, 4),
+            "avg_standby_w": avg_standby_w,
+            "standby_pct": round(standby_points * 100.0 / max(standby_points + active_points, 1), 1),
+            "threshold_w": threshold_w,
+        }
+
+    def get_peak_annotation(self, device_id: str) -> dict | None:
+        """今日异常标注: 功率峰值时间点"""
+        today = datetime.now(CST).strftime("%Y-%m-%d")
+        with self._conn() as conn:
+            row = conn.execute("""
+                SELECT timestamp, power_w, temperature
+                FROM power_readings
+                WHERE device_id=? AND timestamp LIKE ? AND reachable=1 AND power_w IS NOT NULL
+                ORDER BY power_w DESC LIMIT 1
             """, (device_id, f"{today}%")).fetchone()
-            return row[0] if row and row[0] is not None else 0.0
+
+        if not row or row[1] is None:
+            return None
+
+        # 同时求今日平均值用于对比
+        avg_row = conn.execute("""
+            SELECT ROUND(AVG(power_w), 1) as avg_w
+            FROM power_readings
+            WHERE device_id=? AND timestamp LIKE ? AND reachable=1 AND power_on=1
+        """, (device_id, f"{today}%")).fetchone()
+
+        avg_w = avg_row[0] if avg_row else 0
+        peak_w = row[1] or 0
+        multiplier = round(peak_w / avg_w, 1) if avg_w and avg_w > 0 else 0
+
+        return {
+            "timestamp": row[0],
+            "peak_w": peak_w,
+            "avg_w": avg_w,
+            "multiplier": multiplier,
+            "temperature": row[2],
+        }

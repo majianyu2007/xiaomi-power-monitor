@@ -16,15 +16,20 @@ from .db import PowerDB
 from .collector import collect_once
 
 # ============ 配置 ============
-PLUG_IP = os.environ.get("PLUG_IP", "192.168.10.203")
+PLUG_IP = os.environ.get("PLUG_IP", "")
 PLUG_TOKEN = os.environ.get("PLUG_TOKEN", "")
 COLLECT_INTERVAL = int(os.environ.get("COLLECT_INTERVAL", "60"))
 DB_PATH = os.environ.get("DB_PATH", "/data/power_data.db")
 PORT = int(os.environ.get("PORT", "8080"))
 
-# 多设备配置: DEVICES_JSON = [{"id":"plug1","name":"米家插座3","model":"cuco.plug.v3","ip":"...","token":"..."}, ...]
+# 多设备配置: DEVICES_JSON = [{"id":"plug1",...}, ...]
 DEVICES_JSON = os.environ.get("DEVICES_JSON", "")
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "cuco.plug.v3")
+
+# 电价配置 (居民阶梯/峰谷)
+PEAK_RATE = float(os.environ.get("PEAK_RATE", "0.56"))
+VALLEY_RATE = float(os.environ.get("VALLEY_RATE", "0.36"))
+STANDBY_THRESHOLD = float(os.environ.get("STANDBY_THRESHOLD", "5.0"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,10 +42,8 @@ db = PowerDB(DB_PATH)
 # ============ 设备管理 ============
 
 def load_devices() -> list[dict]:
-    """从环境变量加载设备列表，兼容单设备旧配置"""
     devices = []
 
-    # 优先使用 DEVICES_JSON (多设备)
     if DEVICES_JSON:
         try:
             devices = json.loads(DEVICES_JSON)
@@ -48,7 +51,6 @@ def load_devices() -> list[dict]:
         except json.JSONDecodeError as e:
             log.error(f"DEVICES_JSON 解析失败: {e}")
 
-    # 退而使用 PLUG_IP + PLUG_TOKEN (单设备)
     if not devices and PLUG_IP and PLUG_TOKEN:
         devices = [{
             "id": "plug_default",
@@ -59,7 +61,6 @@ def load_devices() -> list[dict]:
         }]
         log.info("使用 PLUG_IP/PLUG_TOKEN 单设备配置")
 
-    # 注册到数据库
     for d in devices:
         db.upsert_device(
             device_id=d["id"],
@@ -81,7 +82,6 @@ if not devices_config:
 # ============ 定时采集 ============
 
 def collect_and_store():
-    """遍历所有设备采集"""
     for dev in devices_config:
         try:
             data = collect_once(dev["ip"], dev["token"], dev.get("model", DEFAULT_MODEL))
@@ -165,6 +165,39 @@ def api_hourly_stats(device_id: str, days: int = 2):
 @app.get("/api/stats/{device_id}/daily")
 def api_daily_stats(device_id: str, days: int = 7):
     return db.get_daily_stats(device_id, days=days)
+
+
+@app.get("/api/stats/{device_id}/heatmap")
+def api_heatmap(device_id: str, days: int = 14):
+    return db.get_heatmap_data(device_id, days=days)
+
+
+@app.get("/api/stats/{device_id}/cost")
+def api_cost(device_id: str, days: int = 30):
+    return db.get_cost_estimate(device_id, days=days,
+                                peak_rate=PEAK_RATE, valley_rate=VALLEY_RATE)
+
+
+@app.get("/api/stats/{device_id}/standby")
+def api_standby(device_id: str):
+    return db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD)
+
+
+@app.get("/api/stats/{device_id}/peak")
+def api_peak(device_id: str):
+    return db.get_peak_annotation(device_id) or {}
+
+
+@app.get("/api/config")
+def api_config():
+    return {
+        "peak_rate": PEAK_RATE,
+        "valley_rate": VALLEY_RATE,
+        "standby_threshold": STANDBY_THRESHOLD,
+        "collect_interval": COLLECT_INTERVAL,
+        "devices": [{"id": d["id"], "name": d.get("name", d["id"])}
+                     for d in devices_config],
+    }
 
 
 # ============ 前端 ============

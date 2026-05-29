@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="auto">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,540 +7,585 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 <style>
 :root {
-  --md-primary: #d0bcff;
-  --md-on-primary: #381e72;
-  --md-primary-container: #4f378b;
-  --md-on-primary-container: #eaddff;
-  --md-secondary: #ccc2dc;
-  --md-surface: #141218;
-  --md-surface-1: #1d1b20;
-  --md-surface-2: #211f26;
-  --md-surface-3: #26232a;
-  --md-surface-4: #2b2830;
-  --md-surface-5: #312d36;
-  --md-on-surface: #e6e0e9;
-  --md-on-surface-variant: #cac4d0;
-  --md-outline: #938f99;
-  --md-outline-variant: #49454f;
-  --md-error: #f2b8b5;
-  --md-error-container: #8c1d18;
-  --md-tertiary: #efb8c8;
-  --md-success: #a8d5a2;
-  --md-warning: #ffd693;
+  --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:24px;
+  --transition:0.2s cubic-bezier(.4,0,.2,1);
 }
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--md-surface);
-  color: var(--md-on-surface);
-  min-height: 100vh;
-  padding-bottom: 2rem;
+[data-theme="light"]{
+  --bg:#f8f7fc;--bg-card:#fff;--bg-card-hover:#f3f1fa;--bg-surface:#eceaf5;
+  --bg-topbar:#ffffffee;--text-primary:#1b1b22;--text-secondary:#6e6e80;
+  --text-tertiary:#9e9eb0;--accent:#6750a4;--accent-light:#e8def8;--accent-text:#21005d;
+  --success:#4caf50;--success-bg:#e8f5e9;--warning:#ff9800;--warning-bg:#fff3e0;
+  --error:#ef5350;--error-bg:#ffebee;--info:#42a5f5;--info-bg:#e3f2fd;
+  --border:#cac4d0;--border-light:#e7e0ec;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg:0 4px 12px rgba(0,0,0,.1);
+  --chart-line:#6750a4;--chart-avg:#42a5f5;--chart-max:#ef5350;--chart-min:#66bb6a;
+  --hm0:#eceaf5;--hm1:#e8def8;--hm2:#9a82db;--hm3:#6750a4;--hm4:#38006b;
+  --scrollbar:#c4c0cc;
 }
-.mono { font-family: 'JetBrains Mono', monospace; }
+[data-theme="dark"]{
+  --bg:#141218;--bg-card:#1d1b20;--bg-card-hover:#26232a;--bg-surface:#211f26;
+  --bg-topbar:#1d1b20ee;--text-primary:#e6e0e9;--text-secondary:#cac4d0;
+  --text-tertiary:#938f99;--accent:#d0bcff;--accent-light:#4f378b;--accent-text:#eaddff;
+  --success:#a8d5a2;--success-bg:#1b3a1a;--warning:#ffd693;--warning-bg:#3a2d0a;
+  --error:#f2b8b5;--error-bg:#3a1210;--info:#a8c7fa;--info-bg:#0d1b2a;
+  --border:#49454f;--border-light:#38353e;
+  --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 4px 12px rgba(0,0,0,.4);
+  --chart-line:#d0bcff;--chart-avg:#42a5f5;--chart-max:#ef5350;--chart-min:#66bb6a;
+  --hm0:#1d1b20;--hm1:#332d41;--hm2:#6750a4;--hm3:#9a82db;--hm4:#e8def8;
+  --scrollbar:#49454f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary);
+  min-height:100vh;transition:background .3s,color .3s;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--scrollbar);border-radius:3px}
+.mono{font-family:var(--font-mono)}
 
-/* Top bar */
-.topbar {
-  background: var(--md-surface-3);
-  border-bottom: 1px solid var(--md-outline-variant);
-  padding: 16px 24px;
-  display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 100;
-  backdrop-filter: blur(16px);
-}
-.topbar h1 { font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
-.topbar h1 .icon { font-size: 1.4rem; }
-.status-pills { display: flex; gap: 8px; align-items: center; }
-.pill {
-  background: var(--md-surface-5);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 20px;
-  padding: 4px 14px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  display: flex; align-items: center; gap: 6px;
-}
-.pill .dot { width: 8px; height: 8px; border-radius: 50%; }
-.pill .dot.green { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
-.pill .dot.red { background: #f87171; box-shadow: 0 0 6px #f8717188; }
-.pill .dot.yellow { background: #fbbf24; box-shadow: 0 0 6px #fbbf2488; }
+/* Top Bar */
+.topbar{background:var(--bg-topbar);border-bottom:1px solid var(--border-light);
+  padding:12px 20px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(16px)}
+.topbar-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.topbar-title{font-size:1.1rem;font-weight:700;white-space:nowrap}
+.time-pill{background:var(--bg-surface);padding:4px 10px;border-radius:20px;
+  font-size:0.78rem;color:var(--text-secondary);font-family:var(--font-mono)}
+
+/* Theme Switch - 3 position */
+.theme-switch{display:flex;background:var(--bg-surface);border-radius:var(--radius-sm);
+  border:1px solid var(--border-light);overflow:hidden}
+.theme-switch button{padding:5px 10px;background:none;border:none;color:var(--text-tertiary);
+  cursor:pointer;font-size:0.85rem;transition:all var(--transition)}
+.theme-switch button.active{background:var(--accent);color:var(--accent-text)}
+.theme-switch button:hover:not(.active){color:var(--text-primary)}
 
 /* Container */
-.container { max-width: 1200px; margin: 0 auto; padding: 20px 16px; }
+.container{max-width:1200px;margin:0 auto;padding:16px}
 
-/* Device tabs */
-.device-tabs {
-  display: flex; gap: 8px; margin-bottom: 24px;
-  overflow-x: auto; padding-bottom: 4px;
-}
-.device-tab {
-  background: var(--md-surface-3);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 12px;
-  padding: 12px 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex; align-items: center; gap: 10px;
-  white-space: nowrap;
-  font-weight: 500; font-size: 0.9rem;
-}
-.device-tab:hover { background: var(--md-surface-4); }
-.device-tab.active {
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
-  border-color: var(--md-primary);
-}
-.device-tab .tab-power { font-family: 'JetBrains Mono', monospace; font-size: 1rem; }
+/* Device Tabs */
+.device-tabs{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;}
+.device-tab{padding:8px 16px;border-radius:var(--radius-lg);cursor:pointer;
+  font-size:0.875rem;font-weight:500;white-space:nowrap;
+  background:var(--bg-card);color:var(--text-secondary);
+  border:1px solid var(--border-light);transition:all var(--transition)}
+.device-tab:hover{background:var(--bg-card-hover)}
+.device-tab.active{background:var(--accent-light);color:var(--accent-text);border-color:var(--accent)}
 
-/* Stat cards */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px; margin-bottom: 24px;
-}
-.stat-card {
-  background: var(--md-surface-2);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 16px;
-  padding: 20px;
-  transition: background 0.2s;
-}
-.stat-card:hover { background: var(--md-surface-3); }
-.stat-card .label { color: var(--md-on-surface-variant); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-.stat-card .value { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 600; margin-top: 6px; line-height: 1; }
-.stat-card .unit { font-size: 0.6em; color: var(--md-on-surface-variant); font-weight: 400; }
-.stat-card.highlight { border-color: var(--md-primary); background: linear-gradient(135deg, var(--md-surface-2), var(--md-primary-container)22); }
+/* Cards */
+.card{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border-light);
+  padding:20px;margin-bottom:16px;box-shadow:var(--shadow);transition:all var(--transition)}
+.card:hover{box-shadow:var(--shadow-lg)}
+.card-title{font-size:0.78rem;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--text-tertiary);margin-bottom:12px;
+  display:flex;align-items:center;gap:6px}
+.badge{padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:600}
 
-/* Chart sections */
-.chart-card {
-  background: var(--md-surface-2);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 20px;
-  padding: 24px;
-  margin-bottom: 16px;
-}
-.chart-card h2 {
-  font-size: 0.95rem; font-weight: 600; color: var(--md-on-surface);
-  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
-}
-.chart-card h2 .badge {
-  font-size: 0.7rem; background: var(--md-surface-5); border-radius: 6px;
-  padding: 2px 8px; color: var(--md-on-surface-variant); font-weight: 400;
-}
+/* Stats Grid */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);
+  padding:14px;text-align:center;transition:all var(--transition)}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.stat-value{font-size:1.4rem;font-weight:700;font-family:var(--font-mono);line-height:1.2}
+.stat-label{font-size:0.7rem;color:var(--text-tertiary);margin-top:2px}
+.stat-unit{font-size:0.75rem;font-weight:400;color:var(--text-secondary)}
+.stat-card.accent .stat-value{color:var(--accent)}
+.stat-card.success .stat-value{color:var(--success)}
+.stat-card.warning .stat-value{color:var(--warning)}
+.stat-card.error .stat-value{color:var(--error)}
 
+/* Live Dot */
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);
+  margin-right:6px;animation:pulse 2s ease-in-out infinite}
+.live-dot.offline{background:var(--error);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
+/* Charts */
+.chart-wrap{position:relative;width:100%}
 
-/* Footer */
-.footer {
-  text-align: center; padding: 24px;
-  color: var(--md-outline);
-  font-size: 0.75rem;
-}
+/* Heatmap */
+.heatmap-container{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.heatmap-grid{display:grid;gap:2px;font-family:var(--font-mono);font-size:0.6rem}
+.heatmap-cell{border-radius:3px;display:flex;align-items:center;justify-content:center;
+  min-width:30px;height:28px;transition:transform .15s;cursor:default;position:relative}
+.heatmap-cell:hover{transform:scale(1.4);z-index:2}
+.heatmap-cell[data-lv="0"]{background:var(--hm0);color:var(--text-tertiary)}
+.heatmap-cell[data-lv="1"]{background:var(--hm1)}
+.heatmap-cell[data-lv="2"]{background:var(--hm2);color:#fff}
+.heatmap-cell[data-lv="3"]{background:var(--hm3);color:#fff}
+.heatmap-cell[data-lv="4"]{background:var(--hm4);color:#fff}
+.hm-label{color:var(--text-tertiary);font-size:0.65rem;display:flex;align-items:center;justify-content:flex-end;padding-right:4px}
+.hm-hlabel{color:var(--text-tertiary);font-size:0.55rem;text-align:center;padding-top:2px}
+.heatmap-legend{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;font-size:0.7rem;color:var(--text-secondary);align-items:center}
+.heatmap-legend i{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle}
+
+/* Cost */
+.cost-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.cost-item{padding:12px;border-radius:var(--radius-sm);background:var(--bg-surface)}
+.cost-label{font-size:0.72rem;color:var(--text-tertiary)}
+.cost-value{font-size:1.15rem;font-weight:700;font-family:var(--font-mono);margin-top:2px}
+.cost-big{grid-column:1/-1;text-align:center;padding:18px;
+  background:var(--accent-light);border-radius:var(--radius-md);border:1px solid var(--accent)}
+.cost-big .cost-value{font-size:1.8rem;color:var(--accent)}
+.cost-big .cost-label{font-size:0.8rem}
+
+/* Standby */
+.standby-bar{height:8px;border-radius:4px;background:var(--bg-surface);overflow:hidden;margin-top:8px}
+.standby-fill{height:100%;border-radius:4px;transition:width .5s ease;
+  background:linear-gradient(90deg,var(--warning),var(--error))}
+
+/* Section Layout */
+.section-grid{display:grid;grid-template-columns:5fr 3fr;gap:16px}
+.section-col{display:flex;flex-direction:column;gap:16px}
+
+.footer{text-align:center;padding:24px;color:var(--text-tertiary);font-size:0.72rem}
+
+/* Empty */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-tertiary)}
+.empty-state .icon{font-size:3rem;margin-bottom:12px}
 
 /* Responsive */
-@media (max-width: 640px) {
-  .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .stat-card .value { font-size: 1.3rem; }
-  .chart-card { padding: 16px; }
-  .topbar { padding: 12px 16px; }
+@media(max-width:900px){
+  .section-grid{grid-template-columns:1fr}
 }
-
-/* Animate */
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
-.pulse { animation: pulse 2s ease-in-out infinite; }
+@media(max-width:768px){
+  .container{padding:12px}
+  .topbar{padding:10px 14px}
+  .stats-grid{grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat-card{padding:10px 6px}
+  .stat-value{font-size:1.15rem}
+  .card{padding:14px}
+  .cost-grid{grid-template-columns:1fr 1fr}
+  .heatmap-cell{min-width:22px;height:22px;font-size:0.5rem}
+  .device-tab{padding:6px 12px;font-size:0.8rem}
+}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .cost-grid{grid-template-columns:1fr}
+  .heatmap-cell{min-width:16px;height:18px;font-size:0}
+  .topbar-title{font-size:0.95rem}
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <h1><span class="icon">⚡</span>功耗监控</h1>
-  <div class="status-pills">
-    <div class="pill" id="statusPill"><span class="dot green" id="statusDot"></span><span id="statusText">加载中...</span></div>
-    <div class="pill mono" id="timePill"></div>
+  <div class="topbar-left">
+    <span class="topbar-title">⚡ 功耗监控</span>
+    <span class="time-pill mono" id="timePill">--:--:--</span>
+  </div>
+  <div class="topbar-right">
+    <div class="theme-switch" id="themeSwitch">
+      <button data-val="light" title="浅色">☀️</button>
+      <button data-val="auto" class="active" title="跟随系统">💻</button>
+      <button data-val="dark" title="深色">🌙</button>
+    </div>
   </div>
 </div>
 
 <div class="container">
-  
-
   <div class="device-tabs" id="deviceTabs"></div>
-
-  <div class="stats-grid" id="statsGrid">
-    <div class="stat-card highlight">
-      <div class="label">实时功率</div>
-      <div class="value" id="statPower">--<span class="unit">W</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">开关状态</div>
-      <div class="value" id="statSwitch">--</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">今日均功率</div>
-      <div class="value" id="statAvgPower">--<span class="unit">W</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">今日峰值</div>
-      <div class="value" id="statMaxPower">--<span class="unit">W</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">今日用电</div>
-      <div class="value" id="statKwh">--<span class="unit">kWh</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">插头温度</div>
-      <div class="value" id="statTemp">--<span class="unit">°C</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">在线率</div>
-      <div class="value" id="statUptime">--<span class="unit">%</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="label">数据点</div>
-      <div class="value" id="statPoints">--</div>
-    </div>
-  </div>
-
-  <div class="chart-card">
-    <h2>📈 今日功率曲线 <span class="badge">每分钟刷新</span></h2>
-    <canvas id="todayChart" height="90"></canvas>
-  </div>
-
-  <div class="chart-card">
-    <h2>📊 24h 功率分布 <span class="badge">min / avg / max</span></h2>
-    <canvas id="hourlyChart" height="90"></canvas>
-  </div>
-
-  <div class="chart-card">
-    <h2>📉 近7天日耗电 <span class="badge">kWh</span></h2>
-    <canvas id="dailyChart" height="70"></canvas>
-  </div>
-
-  <div class="chart-card">
-    <h2>🌡️ 温度趋势 <span class="badge">24h</span></h2>
-    <canvas id="tempChart" height="60"></canvas>
+  <div id="mainContent">
+    <div class="empty-state"><div class="icon">🔌</div><div>加载中...</div></div>
   </div>
 </div>
-
-<div class="footer">
-  数据采集间隔: <span id="intervalDisplay">60s</span> · 上次更新: <span id="lastUpdate" class="mono">--</span> · python-miio + Chart.js
-</div>
+<div class="footer">小米插座功耗监控 · 数据每分钟自动采集 · 页面每30秒刷新</div>
 
 <script>
-const API = '';
+const API = location.origin;
 let currentDevice = null;
-let devices = [];
 let charts = {};
+const chartInstances = {};
 
-// Chart.js dark theme defaults
-Chart.defaults.color = '#cac4d0';
-Chart.defaults.borderColor = '#49454f';
-Chart.defaults.font.family = "'Inter', 'JetBrains Mono', sans-serif";
-
-const chartColors = {
-  real: '#d0bcff',
-  min: '#7c5cfc',
-  avg: '#d0bcff',
-  max: '#efb8c8',
-  temp: '#ffd693',
-  kwh: '#a8d5a2',
-  off: '#49454f',
-  grid: '#2b283066',
-};
-
-function fmt(v, decimals=1, fallback='--') {
-  return v != null && v !== undefined && !isNaN(v) ? Number(v).toFixed(decimals) : fallback;
+// ===== Theme =====
+function getTheme() {
+  return localStorage.getItem('pm_theme') || 'auto';
 }
+function applyTheme(val) {
+  localStorage.setItem('pm_theme', val);
+  let resolved = val;
+  if (val === 'auto') {
+    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.querySelectorAll('#themeSwitch button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === val);
+  });
+  // Redraw charts with new colors
+  Object.values(chartInstances).forEach(c => {
+    if (c && c.options && c.options.scales) {
+      const tc = resolved === 'dark' ? '#cac4d0' : '#6e6e80';
+      const gc = resolved === 'dark' ? '#38353e' : '#e7e0ec';
+      if (c.options.scales.x) { c.options.scales.x.ticks.color = tc; c.options.scales.x.grid.color = gc; }
+      if (c.options.scales.y) { c.options.scales.y.ticks.color = tc; c.options.scales.y.grid.color = gc; }
+      c.update('none');
+    }
+  });
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (getTheme() === 'auto') applyTheme('auto');
+});
+document.querySelectorAll('#themeSwitch button').forEach(b => {
+  b.addEventListener('click', () => applyTheme(b.dataset.val));
+});
+applyTheme(getTheme());
 
-// ---- Initialization ----
+function fmt(n, d=1) { return n != null ? Number(n).toFixed(d) : '--'; }
+function fmtYuan(n) { return n != null ? '¥' + Number(n).toFixed(2) : '--'; }
+
+// ===== Device Tabs =====
 async function init() {
   try {
     const res = await fetch(`${API}/api/devices`);
-    devices = await res.json();
+    const devices = await res.json();
     if (!devices.length) {
-      document.getElementById('statsGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--md-outline)">未配置设备，请设置 DEVICES_JSON 或 PLUG_IP+PLUG_TOKEN</div>';
+      document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">🔌</div><div>未配置设备</div></div>';
       return;
     }
-    renderDeviceTabs();
-    selectDevice(devices[0].device_id);
-  } catch(e) {
-    console.error('Init failed:', e);
-  }
-  
+    renderDeviceTabs(devices);
+    switchDevice(devices[0].device_id);
+  } catch(e) { console.error('Init failed:', e); }
   setInterval(() => { if (currentDevice) refresh(currentDevice); }, 30000);
   updateTime();
   setInterval(updateTime, 1000);
 }
 
-function updateTime() {
-  const now = new Date();
-  document.getElementById('timePill').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
-}
-
-
-
-function renderDeviceTabs() {
+function renderDeviceTabs(devices) {
   const el = document.getElementById('deviceTabs');
-  el.innerHTML = devices.map(d => `
-    <div class="device-tab" id="tab-${d.device_id}" onclick="selectDevice('${d.device_id}')">
-      <span>🔌</span>
-      <span>${d.name || d.device_id}</span>
-      <span class="tab-power mono" id="tabPower-${d.device_id}"></span>
-    </div>
-  `).join('');
+  el.innerHTML = devices.map(d =>
+    `<div class="device-tab" data-id="${d.device_id}" onclick="switchDevice('${d.device_id}')">
+      <span class="live-dot" id="dot_${d.device_id}"></span>${d.name || d.device_id}
+    </div>`
+  ).join('');
 }
 
-async function selectDevice(deviceId) {
+async function switchDevice(deviceId) {
   currentDevice = deviceId;
-  document.querySelectorAll('.device-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById(`tab-${deviceId}`)?.classList.add('active');
+  document.querySelectorAll('.device-tab').forEach(t => t.classList.toggle('active', t.dataset.id === deviceId));
   await refresh(deviceId);
 }
 
 async function refresh(deviceId) {
   try {
-    const [latest, stats, todayR, hourly, daily] = await Promise.all([
-      fetch(`${API}/api/latest/${deviceId}`).then(r => r.json()),
-      fetch(`${API}/api/stats/${deviceId}/today`).then(r => r.json()),
-      fetch(`${API}/api/stats/${deviceId}/today/readings`).then(r => r.json()),
-      fetch(`${API}/api/stats/${deviceId}/hourly`).then(r => r.json()),
-      fetch(`${API}/api/stats/${deviceId}/daily`).then(r => r.json()),
+    const [latest, today, readings, hourly, daily, heatmap, cost, standby, peak, config] = await Promise.all([
+      fetch(`${API}/api/latest/${deviceId}`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/today`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/today/readings`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/hourly?days=2`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/daily?days=7`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/heatmap?days=14`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/cost?days=30`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/standby`).then(r=>r.json()),
+      fetch(`${API}/api/stats/${deviceId}/peak`).then(r=>r.json()),
+      fetch(`${API}/api/config`).then(r=>r.json()),
     ]);
 
-    // Stats cards
-    const reachable = latest.reachable === 1;
-    const powerOn = latest.power_on === 1;
-    document.getElementById('statusDot').className = `dot ${reachable ? (powerOn ? 'green' : 'yellow') : 'red'}`;
-    document.getElementById('statusText').textContent = reachable ? (powerOn ? '运行中' : '已关机') : '不可达';
-    document.getElementById('statPower').innerHTML = reachable ? `${fmt(latest.power_w)}<span class="unit">W</span>` : '--<span class="unit">W</span>';
-    document.getElementById('statSwitch').textContent = reachable ? (powerOn ? '🟢 开' : '🔴 关') : '⚪ --';
-    document.getElementById('statAvgPower').innerHTML = `${fmt(stats.avg_power)}<span class="unit">W</span>`;
-    document.getElementById('statMaxPower').innerHTML = `${fmt(stats.max_power)}<span class="unit">W</span>`;
-    document.getElementById('statKwh').innerHTML = `${fmt(stats.kwh_estimate, 3)}<span class="unit">kWh</span>`;
-    document.getElementById('statTemp').innerHTML = `${latest.temperature ?? '--'}<span class="unit">°C</span>`;
-    document.getElementById('statUptime').innerHTML = `${fmt(stats.uptime_pct ?? 0, 1)}<span class="unit">%</span>`;
-    document.getElementById('statPoints').textContent = stats.total_points ?? 0;
-    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    // Update live dot
+    const dot = document.getElementById('dot_' + deviceId);
+    if (dot) {
+      dot.className = latest.reachable ? 'live-dot' : 'live-dot offline';
+    }
 
-    // Tab power preview
-    const tabPower = document.getElementById(`tabPower-${deviceId}`);
-    if (tabPower && reachable) tabPower.textContent = `${fmt(latest.power_w)}W`;
-
-    // ---- Charts ----
-    // Today line
-    const tLabels = todayR.map(r => r.timestamp?.slice(11, 16) || '');
-    const tData = todayR.map(r => r.reachable ? (r.power_on ? r.power_w : 0) : null);
-    renderTodayChart(tLabels, tData);
-
-    // Hourly bar (SmokePing style: min/avg/max)
-    const hLabels = hourly.map(h => (h.hour_key || '').slice(11) + ':00');
-    renderHourlyChart(
-      hLabels,
-      hourly.map(h => h.min_w),
-      hourly.map(h => h.avg_w),
-      hourly.map(h => h.max_w),
-      hourly.map(h => h.avg_temp),
-    );
-
-    // Daily kWh bar
-    renderDailyChart(
-      daily.map(d => d.day || ''),
-      daily.map(d => d.kwh),
-    );
-
-    // Temp chart
-    const tempData = todayR.map(r => r.reachable ? r.temperature : null);
-    renderTempChart(tLabels, tempData);
-
-  } catch(e) {
-    console.error('Refresh failed:', e);
-  }
+    renderAll(latest, today, readings, hourly, daily, heatmap, cost, standby, peak, config);
+  } catch(e) { console.error('Refresh failed:', e); }
 }
 
-// ---- Chart renderers ----
-function renderTodayChart(labels, data) {
-  if (charts.today) charts.today.destroy();
-  charts.today = new Chart(document.getElementById('todayChart'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '功率 (W)',
-        data,
-        borderColor: chartColors.real,
-        backgroundColor: chartColors.real + '18',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 0,
-        borderWidth: 1.8,
-        spanGaps: false,
-      }]
-    },
+function renderAll(latest, today, readings, hourly, daily, heatmap, cost, standby, peak, config) {
+  const d = latest;
+  const online = d.reachable;
+  const on = d.power_on;
+
+  let html = `
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card accent">
+      <div class="stat-value">${online ? (on ? fmt(d.power_w) : 'OFF') : '--'}${online && on ? '<span class="stat-unit">W</span>' : ''}</div>
+      <div class="stat-label">${online ? (on ? '实时功率' : '已关机') : '不可达'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${fmt(today.avg_power)}<span class="stat-unit">W</span></div>
+      <div class="stat-label">今日均值</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${fmt(today.max_power)}<span class="stat-unit">W</span></div>
+      <div class="stat-label">今日峰值</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value">${fmt(today.kwh_estimate, 3)}<span class="stat-unit">kWh</span></div>
+      <div class="stat-label">今日用电</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${fmt(today.max_temp)}<span class="stat-unit">°C</span></div>
+      <div class="stat-label">最高温度</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-value">${fmt(today.uptime_pct, 0)}<span class="stat-unit">%</span></div>
+      <div class="stat-label">在线率</div>
+    </div>
+  </div>
+
+  <div class="section-grid">
+    <div class="section-col">
+      <!-- Today live chart -->
+      <div class="card">
+        <div class="card-title">📊 今日实时功率</div>
+        <div class="chart-wrap"><canvas id="chartLive" height="180"></canvas></div>
+      </div>
+
+      <!-- 24h min-avg-max -->
+      <div class="card">
+        <div class="card-title">📈 24h 功率分布 (min / avg / max)</div>
+        <div class="chart-wrap"><canvas id="chartHourly" height="160"></canvas></div>
+      </div>
+
+      <!-- Heatmap -->
+      <div class="card">
+        <div class="card-title">🌡️ 功率热力图 (近14天)</div>
+        <div class="heatmap-container" id="heatmapContainer"></div>
+        <div class="heatmap-legend">
+          <span>低</span><i style="background:var(--hm1)"></i>
+          <i style="background:var(--hm2)"></i>
+          <i style="background:var(--hm3)"></i>
+          <i style="background:var(--hm4)"></i>
+          <span>高</span>
+        </div>
+      </div>
+
+      <!-- 7-day kWh -->
+      <div class="card">
+        <div class="card-title">📅 7天用电趋势 (kWh)</div>
+        <div class="chart-wrap"><canvas id="chartDaily" height="140"></canvas></div>
+      </div>
+    </div>
+
+    <div class="section-col">
+      <!-- Peak Annotation -->
+      ${peak && peak.peak_w ? `
+      <div class="card" style="border-color:var(--warning);background:var(--warning-bg)">
+        <div class="card-title">⚡ 今日峰值</div>
+        <div style="font-size:1.5rem;font-weight:700;font-family:var(--font-mono);color:var(--warning)">${fmt(peak.peak_w)}W</div>
+        <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:4px">${peak.timestamp ? peak.timestamp.split(' ')[1] : ''} · 均值 ${fmt(peak.avg_w)}W · <span style="color:var(--error)">${fmt(peak.multiplier)}x</span></div>
+      </div>` : ''}
+
+      <!-- Temperature -->
+      <div class="card">
+        <div class="card-title">🌡️ 温度趋势 (24h)</div>
+        <div class="chart-wrap"><canvas id="chartTemp" height="120"></canvas></div>
+      </div>
+
+      <!-- Cost -->
+      <div class="card">
+        <div class="card-title">💰 电费估算 <span class="badge" style="background:var(--accent-light);color:var(--accent-text)">${config.peak_rate || '?'}元/峰 · ${config.valley_rate || '?'}元/谷</span></div>
+        <div class="cost-big">
+          <div class="cost-label">累计电费 (近${cost.days_covered || 0}天)</div>
+          <div class="cost-value">${fmtYuan(cost.total_cost)}</div>
+        </div>
+        <div class="cost-grid" style="margin-top:10px">
+          <div class="cost-item"><div class="cost-label">峰段用电</div><div class="cost-value">${fmt(cost.peak_kwh,3)}<span class="stat-unit">kWh</span></div></div>
+          <div class="cost-item"><div class="cost-label">谷段用电</div><div class="cost-value">${fmt(cost.valley_kwh,3)}<span class="stat-unit">kWh</span></div></div>
+          <div class="cost-item"><div class="cost-label">日均电费</div><div class="cost-value">${fmtYuan(cost.daily_avg_cost)}</div></div>
+        </div>
+      </div>
+
+      <!-- Standby -->
+      <div class="card">
+        <div class="card-title">💤 待机分析 <span class="badge" style="background:var(--bg-surface);color:var(--text-secondary)">&lt;${standby.threshold_w || 5}W</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <span style="font-size:0.85rem;color:var(--text-secondary)">待机占比</span>
+          <span class="mono" style="font-size:1.1rem;font-weight:700;color:var(--warning)">${fmt(standby.standby_pct, 0)}%</span>
+        </div>
+        <div class="standby-bar"><div class="standby-fill" style="width:${standby.standby_pct || 0}%"></div></div>
+        <div style="margin-top:8px;font-size:0.78rem;color:var(--text-tertiary)">
+          待机 ${fmt(standby.avg_standby_w)}W · ${fmt(standby.standby_kwh, 3)}kWh · ${fmt(standby.standby_points)}个采样点
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('mainContent').innerHTML = html;
+
+  // Paint charts
+  paintLiveChart(readings);
+  paintHourlyChart(hourly);
+  paintDailyChart(daily);
+  paintTempChart(hourly);
+  paintHeatmap(heatmap);
+}
+
+// ===== Chart Helpers =====
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+function chartColors() {
+  const d = isDark();
+  return {
+    txt: d ? '#cac4d0' : '#6e6e80',
+    grid: d ? '#38353e' : '#e7e0ec',
+    line: d ? '#d0bcff' : '#6750a4',
+    avgLine: '#42a5f5',
+    maxLine: d ? '#ef5350' : '#e53935',
+    minFill: d ? 'rgba(102,187,106,0.3)' : 'rgba(102,187,106,0.25)',
+  };
+}
+
+function baseScales(unit) {
+  const c = chartColors();
+  return {
+    x: { ticks: { color: c.txt, maxRotation: 0, maxTicksLimit: 12, font: { size: 10 } }, grid: { color: c.grid } },
+    y: { ticks: { color: c.txt, callback: v => v + unit, font: { size: 10 } }, grid: { color: c.grid }, beginAtZero: true }
+  };
+}
+
+// ===== Live Chart =====
+function paintLiveChart(readings) {
+  destroyChart('live');
+  const c = chartColors();
+  const data = readings.filter(r => r.reachable && r.power_on).map(r => ({
+    x: r.timestamp, y: r.power_w
+  }));
+  if (!data.length) return;
+  chartInstances['live'] = new Chart(document.getElementById('chartLive'), {
+    type: 'line', data: { datasets: [{
+      label: '功率 (W)', data, borderColor: c.line, borderWidth: 2,
+      pointRadius: 0, fill: true,
+      backgroundColor: isDark() ? 'rgba(208,188,255,0.12)' : 'rgba(103,80,164,0.1)',
+      tension: 0.3
+    }] },
     options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        x: {
-          ticks: { maxTicksLimit: 24, color: '#938f99', font: { size: 11 } },
-          grid: { color: chartColors.grid },
-        },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'W', color: '#938f99' },
-          ticks: { color: '#938f99' },
-          grid: { color: chartColors.grid },
-        }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#2b2830ee',
-          titleColor: '#e6e0e9',
-          bodyColor: '#cac4d0',
-          borderColor: '#49454f',
-          borderWidth: 1,
-          padding: 12,
-          cornerRadius: 12,
-        }
-      }
+      responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+      scales: baseScales('W'),
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
     }
   });
 }
 
-function renderHourlyChart(labels, mins, avgs, maxs, temps) {
-  if (charts.hourly) charts.hourly.destroy();
-  charts.hourly = new Chart(document.getElementById('hourlyChart'), {
-    type: 'bar',
-    data: {
+// ===== Hourly Chart (SmokePing-style with Min/Avg/Max bars) =====
+function paintHourlyChart(hourly) {
+  destroyChart('hourly');
+  if (!hourly.length) return;
+  const c = chartColors();
+  const labels = hourly.map(h => h.hour_key.split(' ')[1] + ':00');
+  chartInstances['hourly'] = new Chart(document.getElementById('chartHourly'), {
+    type: 'bar', data: {
       labels,
       datasets: [
-        {
-          label: '最小',
-          data: mins,
-          backgroundColor: '#4f378b88',
-          borderColor: '#7c5cfc66',
-          borderWidth: 1,
-          borderRadius: 3,
-          barPercentage: 0.7,
-        },
-        {
-          label: '平均',
-          data: avgs,
-          backgroundColor: '#d0bcffaa',
-          borderColor: '#d0bcff',
-          borderWidth: 1,
-          borderRadius: 4,
-          barPercentage: 0.7,
-        },
-        {
-          label: '最大',
-          data: maxs,
-          backgroundColor: '#efb8c8aa',
-          borderColor: '#efb8c8',
-          borderWidth: 1,
-          borderRadius: 3,
-          barPercentage: 0.7,
-        },
+        { label: 'Max', data: hourly.map(h => h.max_w), backgroundColor: isDark() ? 'rgba(239,83,80,0.6)' : 'rgba(229,57,53,0.5)', borderRadius: 3 },
+        { label: 'Avg', data: hourly.map(h => h.avg_w), backgroundColor: isDark() ? 'rgba(208,188,255,0.7)' : 'rgba(103,80,164,0.6)', borderRadius: 3 },
+        { label: 'Min', data: hourly.map(h => h.min_w), backgroundColor: isDark() ? 'rgba(102,187,106,0.6)' : 'rgba(102,187,106,0.5)', borderRadius: 3 },
       ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
+    }, options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400 },
       scales: {
-        x: {
-          ticks: { color: '#938f99', font: { size: 11 } },
-          grid: { color: chartColors.grid },
-        },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'W', color: '#938f99' },
-          ticks: { color: '#938f99' },
-          grid: { color: chartColors.grid },
-        }
+        ...baseScales('W'),
+        x: { ...baseScales('').x, stacked: false, ticks: { ...baseScales('').x.ticks, maxTicksLimit: 24, font: { size: 9 } } }
       },
-      plugins: {
-        legend: { labels: { color: '#e6e0e9', usePointStyle: true, pointStyle: 'rectRounded', padding: 16 } },
-        tooltip: {
-          backgroundColor: '#2b2830ee',
-          titleColor: '#e6e0e9',
-          bodyColor: '#cac4d0',
-          borderColor: '#49454f',
-          borderWidth: 1,
-          padding: 12,
-          cornerRadius: 12,
-        }
-      }
+      plugins: { legend: { labels: { color: c.txt, boxWidth: 12, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }
     }
   });
 }
 
-function renderDailyChart(labels, kwh) {
-  if (charts.daily) charts.daily.destroy();
-  charts.daily = new Chart(document.getElementById('dailyChart'), {
-    type: 'bar',
-    data: {
-      labels,
+// ===== Daily kWh Chart =====
+function paintDailyChart(daily) {
+  destroyChart('daily');
+  if (!daily.length) return;
+  const c = chartColors();
+  chartInstances['daily'] = new Chart(document.getElementById('chartDaily'), {
+    type: 'bar', data: {
+      labels: daily.map(d => d.day),
       datasets: [{
-        label: '日耗电 (kWh)',
-        data: kwh,
-        backgroundColor: '#a8d5a2aa',
-        borderColor: '#a8d5a2',
-        borderWidth: 1,
+        label: 'kWh', data: daily.map(d => d.kwh),
+        backgroundColor: isDark() ? 'rgba(208,188,255,0.7)' : 'rgba(103,80,164,0.6)',
         borderRadius: 6,
-        barPercentage: 0.6,
       }]
-    },
-    options: {
-      responsive: true,
+    }, options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
       scales: {
-        x: { ticks: { color: '#938f99' }, grid: { color: chartColors.grid } },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'kWh', color: '#938f99' },
-          ticks: { color: '#938f99' },
-          grid: { color: chartColors.grid },
-        }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: { backgroundColor: '#2b2830ee', titleColor: '#e6e0e9', bodyColor: '#cac4d0', borderColor: '#49454f', borderWidth: 1, padding: 12, cornerRadius: 12 }
-      }
-    }
-  });
-}
-
-function renderTempChart(labels, data) {
-  if (charts.temp) charts.temp.destroy();
-  charts.temp = new Chart(document.getElementById('tempChart'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '温度 (°C)',
-        data,
-        borderColor: chartColors.temp,
-        backgroundColor: chartColors.temp + '18',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 0,
-        borderWidth: 1.8,
-        spanGaps: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        x: { ticks: { maxTicksLimit: 24, color: '#938f99' }, grid: { color: chartColors.grid } },
-        y: {
-          title: { display: true, text: '°C', color: '#938f99' },
-          ticks: { color: '#938f99' },
-          grid: { color: chartColors.grid },
-        }
+        ...baseScales('kWh'),
+        x: { ...baseScales('').x, ticks: { ...baseScales('').x.ticks, font: { size: 10 } } }
       },
       plugins: { legend: { display: false } }
     }
   });
+}
+
+// ===== Temperature Chart =====
+function paintTempChart(hourly) {
+  destroyChart('temp');
+  if (!hourly.length) return;
+  const c = chartColors();
+  const data = hourly.map(h => ({ x: h.hour_key, y: h.avg_temp })).filter(d => d.y != null);
+  if (!data.length) return;
+  chartInstances['temp'] = new Chart(document.getElementById('chartTemp'), {
+    type: 'line', data: { datasets: [{
+      label: '温度 °C', data, borderColor: isDark() ? '#ffd693' : '#ff9800',
+      borderWidth: 2, pointRadius: 1, fill: true,
+      backgroundColor: isDark() ? 'rgba(255,214,147,0.15)' : 'rgba(255,152,0,0.1)',
+      tension: 0.3
+    }] }, options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      scales: baseScales('°C'),
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+// ===== Heatmap =====
+function paintHeatmap(data) {
+  if (!data.length) {
+    document.getElementById('heatmapContainer').innerHTML = '<div style="color:var(--text-tertiary);font-size:0.85rem;text-align:center;padding:20px">暂无数据</div>';
+    return;
+  }
+  const days = [...new Set(data.map(d => d.day))].sort();
+  const hours = Array.from({length: 24}, (_, i) => i);
+
+  // Find max for color scale
+  const maxW = Math.max(...data.map(d => d.avg_w || 0), 1);
+
+  function level(w) {
+    if (w === null || w === undefined) return 0;
+    const r = w / maxW;
+    if (r < 0.01) return 0;
+    if (r < 0.25) return 1;
+    if (r < 0.5) return 2;
+    if (r < 0.75) return 3;
+    return 4;
+  }
+
+  // Build grid: rows=days, cols=24 hours
+  const lookup = {};
+  data.forEach(d => { lookup[`${d.day}_${d.hour}`] = d; });
+
+  let html = `<div class="heatmap-grid" style="grid-template-columns: 60px repeat(24, 1fr);">`;
+  // Hour labels row
+  html += `<div class="hm-label"></div>`;
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="hm-hlabel">${h}</div>`;
+  }
+  // Day rows
+  for (const day of days) {
+    const shortDay = day.slice(5); // MM-DD
+    html += `<div class="hm-label">${shortDay}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const d = lookup[`${day}_${h}`];
+      const w = d ? d.avg_w : null;
+      const lv = level(w);
+      const tip = d ? `${shortDay} ${h}:00 — ${fmt(w)}W` : `${shortDay} ${h}:00 — 无数据`;
+      html += `<div class="heatmap-cell" data-lv="${lv}" title="${tip}">${w !== null && w > 0 ? Math.round(w) : ''}</div>`;
+    }
+  }
+  html += `</div>`;
+  document.getElementById('heatmapContainer').innerHTML = html;
+}
+
+function updateTime() {
+  const now = new Date();
+  document.getElementById('timePill').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
 }
 
 init();
