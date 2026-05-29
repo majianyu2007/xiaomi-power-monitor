@@ -1,11 +1,13 @@
 """
 小米智能插座功耗监控 - FastAPI 主服务 (多设备版)
+支持: 日/周/月/年/自定义范围视图
 """
 
 import os
 import json
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -155,35 +157,45 @@ def api_latest(device_id: str):
 
 
 @app.get("/api/stats/{device_id}/today")
-def api_today_stats(device_id: str):
-    stats = db.get_today_stats(device_id)
+def api_today_stats(device_id: str, date: Optional[str] = None):
+    stats = db.get_today_stats(device_id, date=date)
     stats["device_id"] = device_id
-    stats["uptime_pct"] = db.get_uptime_today(device_id)
+    stats["uptime_pct"] = db.get_uptime_today(device_id, date=date)
     return stats
 
 
 @app.get("/api/stats/{device_id}/today/readings")
-def api_today_readings(device_id: str):
-    return db.get_today_readings(device_id)
+def api_today_readings(device_id: str, date: Optional[str] = None):
+    return db.get_today_readings(device_id, date=date)
 
 
 @app.get("/api/stats/{device_id}/hourly")
-def api_hourly_stats(device_id: str, days: int = 2):
-    return db.get_hourly_stats(device_id, days=days)
+def api_hourly_stats(device_id: str, days: int = 2,
+                     start_date: Optional[str] = None, end_date: Optional[str] = None):
+    return db.get_hourly_stats(device_id, days=days, start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/stats/{device_id}/daily")
-def api_daily_stats(device_id: str, days: int = 7):
-    return db.get_daily_stats(device_id, days=days)
+def api_daily_stats(device_id: str, days: int = 7,
+                    start_date: Optional[str] = None, end_date: Optional[str] = None):
+    return db.get_daily_stats(device_id, days=days, start_date=start_date, end_date=end_date)
+
+
+@app.get("/api/stats/{device_id}/monthly")
+def api_monthly_stats(device_id: str, months: int = 12,
+                      start_date: Optional[str] = None, end_date: Optional[str] = None):
+    return db.get_monthly_stats(device_id, months=months, start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/stats/{device_id}/heatmap")
-def api_heatmap(device_id: str, days: int = 14):
-    return db.get_heatmap_data(device_id, days=days)
+def api_heatmap(device_id: str, days: int = 14,
+                start_date: Optional[str] = None, end_date: Optional[str] = None):
+    return db.get_heatmap_data(device_id, days=days, start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/stats/{device_id}/cost")
-def api_cost(device_id: str, days: int = 30):
+def api_cost(device_id: str, days: int = 30,
+             start_date: Optional[str] = None, end_date: Optional[str] = None):
     # 只有峰谷都设置了才用分时计价
     if PEAK_RATE is not None and VALLEY_RATE is not None:
         peak, valley = PEAK_RATE, VALLEY_RATE
@@ -192,20 +204,23 @@ def api_cost(device_id: str, days: int = 30):
         peak, valley = ELECTRICITY_RATE, ELECTRICITY_RATE
         is_tou = False
     result = db.get_cost_estimate(device_id, days=days, peak_rate=peak, valley_rate=valley,
-                                    peak_start=PEAK_HOURS_START, peak_end=PEAK_HOURS_END)
+                                    peak_start=PEAK_HOURS_START, peak_end=PEAK_HOURS_END,
+                                    start_date=start_date, end_date=end_date)
     result["flat_rate"] = ELECTRICITY_RATE
     result["is_tou"] = is_tou
     return result
 
 
 @app.get("/api/stats/{device_id}/standby")
-def api_standby(device_id: str, days: int = 30):
-    return db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD, days=days)
+def api_standby(device_id: str, days: int = 30,
+                start_date: Optional[str] = None, end_date: Optional[str] = None):
+    return db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD, days=days,
+                                 start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/stats/{device_id}/peak")
-def api_peak(device_id: str):
-    return db.get_peak_annotation(device_id) or {}
+def api_peak(device_id: str, date: Optional[str] = None):
+    return db.get_peak_annotation(device_id, date=date) or {}
 
 
 @app.get("/api/config")

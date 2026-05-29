@@ -1,6 +1,6 @@
 """
 小米智能插座 功耗监控 - 数据库层 (多设备版)
-支持: 热力图、峰谷电费、待机检测、异常标注
+支持: 热力图、峰谷电费、待机检测、异常标注、日/周/月/年/自定义范围
 
 时间戳统一使用 CST (UTC+8) 存储，查询不再对存储时间做偏移。
 SQLite 的 datetime('now') 返回 UTC，对比时需要 +8 hours 转为 CST。
@@ -68,6 +68,23 @@ class PowerDB:
                 ON power_readings(device_id, timestamp)
             """)
 
+    # ---- Helpers ----
+
+    def _range_filter(self, device_id: str, days: int = None,
+                      start_date: str = None, end_date: str = None):
+        """生成日期范围过滤条件。
+        优先使用 start_date/end_date (YYYY-MM-DD)，否则用 days 回溯。
+        返回 (where_clause, params) — params 不含 interval_hours 等前缀参数。
+        """
+        if start_date and end_date:
+            return "device_id=? AND timestamp >= ? AND timestamp <= ?", (
+                device_id, f"{start_date} 00:00:00", f"{end_date} 23:59:59"
+            )
+        days = days or 7
+        return "device_id=? AND timestamp >= datetime('now', ?, '+8 hours')", (
+            device_id, f"-{days} days"
+        )
+
     # ---- Device Management ----
 
     def upsert_device(self, device_id: str, name: str, model: str = "",
@@ -102,9 +119,6 @@ class PowerDB:
         return ts
 
     # ---- Basic Queries ----
-    # 时间戳已存为 CST，所有查询中:
-    # - datetime('now', '+8 hours') 用于生成 CST "现在" 时刻，与存储的 CST 时间戳做比较
-    # - 对 timestamp 列做 strftime/DATE 时不再 +8 hours (因为已经是 CST)
 
     def get_latest(self, device_id: str) -> dict | None:
         with self._conn() as conn:
@@ -126,9 +140,10 @@ class PowerDB:
             """).fetchall()
         return [dict(r) for r in rows]
 
-    def get_today_stats(self, device_id: str) -> dict:
-        """今日统计 — kWh 按实际采集间隔计算，而非硬编码60s"""
-        today = datetime.now(CST).strftime("%Y-%m-%d")
+    def get_today_stats(self, device_id: str, date: str = None) -> dict:
+        """指定日期统计 — 默认今天。kWh 按实际采集间隔计算"""
+        if date is None:
+            date = datetime.now(CST).strftime("%Y-%m-%d")
         interval_hours = self.collect_interval / 3600.0
         with self._conn() as conn:
             row = conn.execute("""
@@ -144,36 +159,40 @@ class PowerDB:
                     ROUND(AVG(CASE WHEN reachable=1 AND temperature IS NOT NULL THEN temperature END), 1) as avg_temp
                 FROM power_readings
                 WHERE device_id=? AND timestamp LIKE ?
-            """, (interval_hours, device_id, f"{today}%")).fetchone()
+            """, (interval_hours, device_id, f"{date}%")).fetchone()
         return dict(row) if row else {}
 
-    def get_today_readings(self, device_id: str) -> list[dict]:
-        today = datetime.now(CST).strftime("%Y-%m-%d")
+    def get_today_readings(self, device_id: str, date: str = None) -> list[dict]:
+        """指定日期的原始读数 — 默认今天"""
+        if date is None:
+            date = datetime.now(CST).strftime("%Y-%m-%d")
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT timestamp, power_w, power_on, reachable, temperature
                 FROM power_readings
                 WHERE device_id=? AND timestamp LIKE ?
                 ORDER BY timestamp
-            """, (device_id, f"{today}%")).fetchall()
+            """, (device_id, f"{date}%")).fetchall()
         return [dict(r) for r in rows]
 
-    def get_uptime_today(self, device_id: str) -> float:
-        today = datetime.now(CST).strftime("%Y-%m-%d")
+    def get_uptime_today(self, device_id: str, date: str = None) -> float:
+        if date is None:
+            date = datetime.now(CST).strftime("%Y-%m-%d")
         with self._conn() as conn:
             row = conn.execute("""
                 SELECT
                     ROUND(SUM(CASE WHEN reachable=1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as uptime_pct
                 FROM power_readings
                 WHERE device_id=? AND timestamp LIKE ?
-            """, (device_id, f"{today}%")).fetchone()
-            # sqlite3.Row supports numeric indexing
+            """, (device_id, f"{date}%")).fetchone()
             return dict(row).get("uptime_pct") or 0.0
 
-    def get_hourly_stats(self, device_id: str, days: int = 2) -> list[dict]:
-        """按小时统计 — timestamp 已是 CST，不再 +8"""
+    def get_hourly_stats(self, device_id: str, days: int = 2,
+                         start_date: str = None, end_date: str = None) -> list[dict]:
+        """按小时统计 — 支持日期范围或 days 回溯"""
+        where, rparams = self._range_filter(device_id, days, start_date, end_date)
         with self._conn() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(f"""
                 SELECT
                     strftime('%Y-%m-%d %H', timestamp) as hour_key,
                     ROUND(MIN(CASE WHEN power_on=1 AND reachable=1 AND power_w IS NOT NULL THEN power_w END), 1) as min_w,
@@ -183,17 +202,19 @@ class PowerDB:
                     COUNT(*) as total,
                     ROUND(AVG(CASE WHEN reachable=1 AND temperature IS NOT NULL THEN temperature END), 1) as avg_temp
                 FROM power_readings
-                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+                WHERE {where}
                 GROUP BY hour_key
                 ORDER BY hour_key
-            """, (device_id, f"-{days} days")).fetchall()
+            """, rparams).fetchall()
         return [dict(r) for r in rows]
 
-    def get_daily_stats(self, device_id: str, days: int = 7) -> list[dict]:
-        """按天统计 — timestamp 已是 CST，DATE 直接取无需 +8"""
+    def get_daily_stats(self, device_id: str, days: int = 7,
+                        start_date: str = None, end_date: str = None) -> list[dict]:
+        """按天统计 — 支持日期范围或 days 回溯"""
         interval_hours = self.collect_interval / 3600.0
+        where, rparams = self._range_filter(device_id, days, start_date, end_date)
         with self._conn() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(f"""
                 SELECT
                     DATE(timestamp) as day,
                     SUM(CASE WHEN reachable=0 THEN 1 ELSE 0 END) as unreachable,
@@ -204,18 +225,48 @@ class PowerDB:
                     ROUND(AVG(CASE WHEN reachable=1 AND temperature IS NOT NULL THEN temperature END), 1) as avg_temp,
                     MAX(CASE WHEN reachable=1 THEN temperature END) as max_temp
                 FROM power_readings
-                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+                WHERE {where}
                 GROUP BY day
                 ORDER BY day
-            """, (interval_hours, device_id, f"-{days} days")).fetchall()
+            """, (interval_hours, *rparams)).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_monthly_stats(self, device_id: str, months: int = 12,
+                          start_date: str = None, end_date: str = None) -> list[dict]:
+        """按月统计 — kWh、avg/max 功率、温度"""
+        interval_hours = self.collect_interval / 3600.0
+        where, rparams = self._range_filter(device_id, months * 30 if not start_date else None,
+                                            start_date, end_date)
+        # 如果没有 start_date，用月份回溯
+        if not start_date:
+            where = "device_id=? AND timestamp >= datetime('now', ?, '+8 hours')"
+            rparams = (device_id, f"-{months} months")
+        with self._conn() as conn:
+            rows = conn.execute(f"""
+                SELECT
+                    strftime('%Y-%m', timestamp) as month,
+                    ROUND(SUM(CASE WHEN power_on=1 AND reachable=1 AND power_w IS NOT NULL THEN power_w END) * ? / 1000.0, 4) as kwh,
+                    ROUND(AVG(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL THEN power_w END), 1) as avg_power,
+                    ROUND(MAX(CASE WHEN reachable=1 AND power_w IS NOT NULL THEN power_w END), 1) as max_power,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN reachable=0 THEN 1 ELSE 0 END) as unreachable,
+                    ROUND(AVG(CASE WHEN reachable=1 AND temperature IS NOT NULL THEN temperature END), 1) as avg_temp,
+                    MAX(CASE WHEN reachable=1 THEN temperature END) as max_temp
+                FROM power_readings
+                WHERE {where}
+                GROUP BY month
+                ORDER BY month
+            """, (interval_hours, *rparams)).fetchall()
         return [dict(r) for r in rows]
 
     # ---- Advanced Queries ----
 
-    def get_heatmap_data(self, device_id: str, days: int = 14) -> list[dict]:
-        """功率热力图 — timestamp 已是 CST，不再 +8"""
+    def get_heatmap_data(self, device_id: str, days: int = 14,
+                         start_date: str = None, end_date: str = None) -> list[dict]:
+        """功率热力图 — 支持日期范围"""
+        where, rparams = self._range_filter(device_id, days, start_date, end_date)
         with self._conn() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(f"""
                 SELECT
                     DATE(timestamp) as day,
                     CAST(strftime('%H', timestamp) AS INTEGER) as hour,
@@ -224,20 +275,21 @@ class PowerDB:
                     COUNT(CASE WHEN reachable=1 THEN 1 END) as samples,
                     SUM(CASE WHEN reachable=0 THEN 1 ELSE 0 END) as offline
                 FROM power_readings
-                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+                WHERE {where}
                 GROUP BY day, hour
                 ORDER BY day, hour
-            """, (device_id, f"-{days} days")).fetchall()
+            """, rparams).fetchall()
         return [dict(r) for r in rows]
 
     def get_cost_estimate(self, device_id: str, days: int = 30,
                           peak_rate: float = 0.56, valley_rate: float = 0.36,
-                          peak_start: int = 8, peak_end: int = 21) -> dict:
-        """电费估算 — timestamp 已是 CST，strftime('%H', timestamp) 直接取 CST 小时
-        peak_start/peak_end: 峰段起止小时 (含起不含终), 默认 8-21"""
+                          peak_start: int = 8, peak_end: int = 21,
+                          start_date: str = None, end_date: str = None) -> dict:
+        """电费估算 — 支持日期范围"""
         interval_hours = self.collect_interval / 3600.0
+        where, rparams = self._range_filter(device_id, days, start_date, end_date)
         with self._conn() as conn:
-            row = conn.execute("""
+            row = conn.execute(f"""
                 SELECT
                     ROUND(SUM(
                         CASE
@@ -256,10 +308,10 @@ class PowerDB:
                     ROUND(SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL THEN power_w END) * ? / 1000.0, 4) as total_kwh,
                     COUNT(DISTINCT DATE(timestamp)) as days_covered
                 FROM power_readings
-                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+                WHERE {where}
             """, (peak_start, peak_end, interval_hours,
                   peak_start, peak_end, interval_hours,
-                  interval_hours, device_id, f"-{days} days")).fetchone()
+                  interval_hours, *rparams)).fetchone()
 
         if not row or row[2] is None:
             return {"total_kwh": 0, "peak_kwh": 0, "valley_kwh": 0,
@@ -288,11 +340,13 @@ class PowerDB:
             "valley_rate": valley_rate,
         }
 
-    def get_standby_stats(self, device_id: str, threshold_w: float = 5.0, days: int = 30) -> dict:
+    def get_standby_stats(self, device_id: str, threshold_w: float = 5.0, days: int = 30,
+                          start_date: str = None, end_date: str = None) -> dict:
         """待机检测 — kWh 按实际间隔计算，默认统计近30天"""
         interval_hours = self.collect_interval / 3600.0
+        where, rparams = self._range_filter(device_id, days, start_date, end_date)
         with self._conn() as conn:
-            row = conn.execute("""
+            row = conn.execute(f"""
                 SELECT
                     SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL AND power_w < ? THEN 1 ELSE 0 END) as standby_points,
                     SUM(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL AND power_w >= ? THEN 1 ELSE 0 END) as active_points,
@@ -300,8 +354,8 @@ class PowerDB:
                     ROUND(AVG(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL AND power_w < ? THEN power_w END), 1) as avg_standby_w,
                     COUNT(*) as total
                 FROM power_readings
-                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
-            """, (threshold_w, threshold_w, threshold_w, interval_hours, threshold_w, device_id, f"-{days} days")).fetchone()
+                WHERE {where}
+            """, (threshold_w, threshold_w, threshold_w, interval_hours, threshold_w, *rparams)).fetchone()
 
         if not row:
             return {"standby_points": 0, "active_points": 0, "standby_kwh": 0,
@@ -321,16 +375,17 @@ class PowerDB:
             "threshold_w": threshold_w,
         }
 
-    def get_peak_annotation(self, device_id: str) -> dict | None:
-        """今日异常标注: 功率峰值时间点 — 两个查询在同一连接内完成"""
-        today = datetime.now(CST).strftime("%Y-%m-%d")
+    def get_peak_annotation(self, device_id: str, date: str = None) -> dict | None:
+        """指定日期的异常标注: 功率峰值时间点 — 默认今天"""
+        if date is None:
+            date = datetime.now(CST).strftime("%Y-%m-%d")
         with self._conn() as conn:
             row = conn.execute("""
                 SELECT timestamp, power_w, temperature
                 FROM power_readings
                 WHERE device_id=? AND timestamp LIKE ? AND reachable=1 AND power_w IS NOT NULL
                 ORDER BY power_w DESC LIMIT 1
-            """, (device_id, f"{today}%")).fetchone()
+            """, (device_id, f"{date}%")).fetchone()
 
             if not row or row[1] is None:
                 return None
@@ -339,7 +394,7 @@ class PowerDB:
                 SELECT ROUND(AVG(power_w), 1) as avg_w
                 FROM power_readings
                 WHERE device_id=? AND timestamp LIKE ? AND reachable=1 AND power_on=1 AND power_w IS NOT NULL
-            """, (device_id, f"{today}%")).fetchone()
+            """, (device_id, f"{date}%")).fetchone()
 
         avg_w = dict(avg_row).get("avg_w") if avg_row else 0
         peak_w = row[1] or 0
@@ -355,6 +410,8 @@ class PowerDB:
 
     def purge_old(self) -> int:
         """清理超过 retention_days 天的旧数据，返回删除行数"""
+        if self.retention_days <= 0:
+            return 0
         with self._conn() as conn:
             cursor = conn.execute(
                 "DELETE FROM power_readings WHERE timestamp < datetime('now', ?, '+8 hours')",
