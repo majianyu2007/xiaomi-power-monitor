@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ 功耗监控</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root {
+  --md-primary: #d0bcff;
+  --md-on-primary: #381e72;
+  --md-primary-container: #4f378b;
+  --md-on-primary-container: #eaddff;
+  --md-secondary: #ccc2dc;
+  --md-surface: #141218;
+  --md-surface-1: #1d1b20;
+  --md-surface-2: #211f26;
+  --md-surface-3: #26232a;
+  --md-surface-4: #2b2830;
+  --md-surface-5: #312d36;
+  --md-on-surface: #e6e0e9;
+  --md-on-surface-variant: #cac4d0;
+  --md-outline: #938f99;
+  --md-outline-variant: #49454f;
+  --md-error: #f2b8b5;
+  --md-error-container: #8c1d18;
+  --md-tertiary: #efb8c8;
+  --md-success: #a8d5a2;
+  --md-warning: #ffd693;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  min-height: 100vh;
+  padding-bottom: 2rem;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Top bar */
+.topbar {
+  background: var(--md-surface-3);
+  border-bottom: 1px solid var(--md-outline-variant);
+  padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(16px);
+}
+.topbar h1 { font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.topbar h1 .icon { font-size: 1.4rem; }
+.status-pills { display: flex; gap: 8px; align-items: center; }
+.pill {
+  background: var(--md-surface-5);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+}
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+.pill .dot.green { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
+.pill .dot.red { background: #f87171; box-shadow: 0 0 6px #f8717188; }
+.pill .dot.yellow { background: #fbbf24; box-shadow: 0 0 6px #fbbf2488; }
+
+/* Container */
+.container { max-width: 1200px; margin: 0 auto; padding: 20px 16px; }
+
+/* Device tabs */
+.device-tabs {
+  display: flex; gap: 8px; margin-bottom: 24px;
+  overflow-x: auto; padding-bottom: 4px;
+}
+.device-tab {
+  background: var(--md-surface-3);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 10px;
+  white-space: nowrap;
+  font-weight: 500; font-size: 0.9rem;
+}
+.device-tab:hover { background: var(--md-surface-4); }
+.device-tab.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: var(--md-primary);
+}
+.device-tab .tab-power { font-family: 'JetBrains Mono', monospace; font-size: 1rem; }
+
+/* Stat cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--md-surface-2);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  padding: 20px;
+  transition: background 0.2s;
+}
+.stat-card:hover { background: var(--md-surface-3); }
+.stat-card .label { color: var(--md-on-surface-variant); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 600; margin-top: 6px; line-height: 1; }
+.stat-card .unit { font-size: 0.6em; color: var(--md-on-surface-variant); font-weight: 400; }
+.stat-card.highlight { border-color: var(--md-primary); background: linear-gradient(135deg, var(--md-surface-2), var(--md-primary-container)22); }
+
+/* Chart sections */
+.chart-card {
+  background: var(--md-surface-2);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.chart-card h2 {
+  font-size: 0.95rem; font-weight: 600; color: var(--md-on-surface);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.chart-card h2 .badge {
+  font-size: 0.7rem; background: var(--md-surface-5); border-radius: 6px;
+  padding: 2px 8px; color: var(--md-on-surface-variant); font-weight: 400;
+}
+
+/* Outage banner */
+.outage-banner {
+  background: linear-gradient(135deg, #42200688, #7c2d1288);
+  border: 1px solid #ea580c88;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.9rem;
+}
+.outage-banner .icon { font-size: 1.3rem; }
+
+/* Footer */
+.footer {
+  text-align: center; padding: 24px;
+  color: var(--md-outline);
+  font-size: 0.75rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+  .stat-card .value { font-size: 1.3rem; }
+  .chart-card { padding: 16px; }
+  .topbar { padding: 12px 16px; }
+}
+
+/* Animate */
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1><span class="icon">⚡</span>功耗监控</h1>
+  <div class="status-pills">
+    <div class="pill" id="statusPill"><span class="dot green" id="statusDot"></span><span id="statusText">加载中...</span></div>
+    <div class="pill mono" id="timePill"></div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="outageBanner" style="display:none" class="outage-banner">
+    <span class="icon">🔌</span>
+    <span>宿舍断电时段 (23:30-06:00)，插座可能不可达，数据采集中断</span>
+  </div>
+
+  <div class="device-tabs" id="deviceTabs"></div>
+
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card highlight">
+      <div class="label">实时功率</div>
+      <div class="value" id="statPower">--<span class="unit">W</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">开关状态</div>
+      <div class="value" id="statSwitch">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">今日均功率</div>
+      <div class="value" id="statAvgPower">--<span class="unit">W</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">今日峰值</div>
+      <div class="value" id="statMaxPower">--<span class="unit">W</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">今日用电</div>
+      <div class="value" id="statKwh">--<span class="unit">kWh</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">插头温度</div>
+      <div class="value" id="statTemp">--<span class="unit">°C</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">在线率</div>
+      <div class="value" id="statUptime">--<span class="unit">%</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">数据点</div>
+      <div class="value" id="statPoints">--</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h2>📈 今日功率曲线 <span class="badge">每分钟刷新</span></h2>
+    <canvas id="todayChart" height="90"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h2>📊 24h 功率分布 <span class="badge">min / avg / max</span></h2>
+    <canvas id="hourlyChart" height="90"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h2>📉 近7天日耗电 <span class="badge">kWh</span></h2>
+    <canvas id="dailyChart" height="70"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h2>🌡️ 温度趋势 <span class="badge">24h</span></h2>
+    <canvas id="tempChart" height="60"></canvas>
+  </div>
+</div>
+
+<div class="footer">
+  数据采集间隔: <span id="intervalDisplay">60s</span> · 上次更新: <span id="lastUpdate" class="mono">--</span> · python-miio + Chart.js
+</div>
+
+<script>
+const API = '';
+let currentDevice = null;
+let devices = [];
+let charts = {};
+
+// Chart.js dark theme defaults
+Chart.defaults.color = '#cac4d0';
+Chart.defaults.borderColor = '#49454f';
+Chart.defaults.font.family = "'Inter', 'JetBrains Mono', sans-serif";
+
+const chartColors = {
+  real: '#d0bcff',
+  min: '#7c5cfc',
+  avg: '#d0bcff',
+  max: '#efb8c8',
+  temp: '#ffd693',
+  kwh: '#a8d5a2',
+  off: '#49454f',
+  grid: '#2b283066',
+};
+
+function fmt(v, decimals=1, fallback='--') {
+  return v != null && v !== undefined && !isNaN(v) ? Number(v).toFixed(decimals) : fallback;
+}
+
+// ---- Initialization ----
+async function init() {
+  try {
+    const res = await fetch(`${API}/api/devices`);
+    devices = await res.json();
+    if (!devices.length) {
+      document.getElementById('statsGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--md-outline)">未配置设备，请设置 DEVICES_JSON 或 PLUG_IP+PLUG_TOKEN</div>';
+      return;
+    }
+    renderDeviceTabs();
+    selectDevice(devices[0].device_id);
+  } catch(e) {
+    console.error('Init failed:', e);
+  }
+  checkOutage();
+  setInterval(checkOutage, 60000);
+  setInterval(() => { if (currentDevice) refresh(currentDevice); }, 30000);
+  updateTime();
+  setInterval(updateTime, 1000);
+}
+
+function updateTime() {
+  const now = new Date();
+  document.getElementById('timePill').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
+}
+
+async function checkOutage() {
+  try {
+    const res = await fetch(`${API}/api/outage`);
+    const data = await res.json();
+    document.getElementById('outageBanner').style.display = data.is_night_outage ? 'flex' : 'none';
+  } catch(e) {}
+}
+
+function renderDeviceTabs() {
+  const el = document.getElementById('deviceTabs');
+  el.innerHTML = devices.map(d => `
+    <div class="device-tab" id="tab-${d.device_id}" onclick="selectDevice('${d.device_id}')">
+      <span>🔌</span>
+      <span>${d.name || d.device_id}</span>
+      <span class="tab-power mono" id="tabPower-${d.device_id}"></span>
+    </div>
+  `).join('');
+}
+
+async function selectDevice(deviceId) {
+  currentDevice = deviceId;
+  document.querySelectorAll('.device-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${deviceId}`)?.classList.add('active');
+  await refresh(deviceId);
+}
+
+async function refresh(deviceId) {
+  try {
+    const [latest, stats, todayR, hourly, daily] = await Promise.all([
+      fetch(`${API}/api/latest/${deviceId}`).then(r => r.json()),
+      fetch(`${API}/api/stats/${deviceId}/today`).then(r => r.json()),
+      fetch(`${API}/api/stats/${deviceId}/today/readings`).then(r => r.json()),
+      fetch(`${API}/api/stats/${deviceId}/hourly`).then(r => r.json()),
+      fetch(`${API}/api/stats/${deviceId}/daily`).then(r => r.json()),
+    ]);
+
+    // Stats cards
+    const reachable = latest.reachable === 1;
+    const powerOn = latest.power_on === 1;
+    document.getElementById('statusDot').className = `dot ${reachable ? (powerOn ? 'green' : 'yellow') : 'red'}`;
+    document.getElementById('statusText').textContent = reachable ? (powerOn ? '运行中' : '已关机') : '不可达';
+    document.getElementById('statPower').innerHTML = reachable ? `${fmt(latest.power_w)}<span class="unit">W</span>` : '--<span class="unit">W</span>';
+    document.getElementById('statSwitch').textContent = reachable ? (powerOn ? '🟢 开' : '🔴 关') : '⚪ --';
+    document.getElementById('statAvgPower').innerHTML = `${fmt(stats.avg_power)}<span class="unit">W</span>`;
+    document.getElementById('statMaxPower').innerHTML = `${fmt(stats.max_power)}<span class="unit">W</span>`;
+    document.getElementById('statKwh').innerHTML = `${fmt(stats.kwh_estimate, 3)}<span class="unit">kWh</span>`;
+    document.getElementById('statTemp').innerHTML = `${latest.temperature ?? '--'}<span class="unit">°C</span>`;
+    document.getElementById('statUptime').innerHTML = `${fmt(stats.uptime_pct ?? 0, 1)}<span class="unit">%</span>`;
+    document.getElementById('statPoints').textContent = stats.total_points ?? 0;
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+
+    // Tab power preview
+    const tabPower = document.getElementById(`tabPower-${deviceId}`);
+    if (tabPower && reachable) tabPower.textContent = `${fmt(latest.power_w)}W`;
+
+    // ---- Charts ----
+    // Today line
+    const tLabels = todayR.map(r => r.timestamp?.slice(11, 16) || '');
+    const tData = todayR.map(r => r.reachable ? (r.power_on ? r.power_w : 0) : null);
+    renderTodayChart(tLabels, tData);
+
+    // Hourly bar (SmokePing style: min/avg/max)
+    const hLabels = hourly.map(h => (h.hour_key || '').slice(11) + ':00');
+    renderHourlyChart(
+      hLabels,
+      hourly.map(h => h.min_w),
+      hourly.map(h => h.avg_w),
+      hourly.map(h => h.max_w),
+      hourly.map(h => h.avg_temp),
+    );
+
+    // Daily kWh bar
+    renderDailyChart(
+      daily.map(d => d.day || ''),
+      daily.map(d => d.kwh),
+    );
+
+    // Temp chart
+    const tempData = todayR.map(r => r.reachable ? r.temperature : null);
+    renderTempChart(tLabels, tempData);
+
+  } catch(e) {
+    console.error('Refresh failed:', e);
+  }
+}
+
+// ---- Chart renderers ----
+function renderTodayChart(labels, data) {
+  if (charts.today) charts.today.destroy();
+  charts.today = new Chart(document.getElementById('todayChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '功率 (W)',
+        data,
+        borderColor: chartColors.real,
+        backgroundColor: chartColors.real + '18',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        borderWidth: 1.8,
+        spanGaps: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 24, color: '#938f99', font: { size: 11 } },
+          grid: { color: chartColors.grid },
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'W', color: '#938f99' },
+          ticks: { color: '#938f99' },
+          grid: { color: chartColors.grid },
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2b2830ee',
+          titleColor: '#e6e0e9',
+          bodyColor: '#cac4d0',
+          borderColor: '#49454f',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 12,
+        }
+      }
+    }
+  });
+}
+
+function renderHourlyChart(labels, mins, avgs, maxs, temps) {
+  if (charts.hourly) charts.hourly.destroy();
+  charts.hourly = new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '最小',
+          data: mins,
+          backgroundColor: '#4f378b88',
+          borderColor: '#7c5cfc66',
+          borderWidth: 1,
+          borderRadius: 3,
+          barPercentage: 0.7,
+        },
+        {
+          label: '平均',
+          data: avgs,
+          backgroundColor: '#d0bcffaa',
+          borderColor: '#d0bcff',
+          borderWidth: 1,
+          borderRadius: 4,
+          barPercentage: 0.7,
+        },
+        {
+          label: '最大',
+          data: maxs,
+          backgroundColor: '#efb8c8aa',
+          borderColor: '#efb8c8',
+          borderWidth: 1,
+          borderRadius: 3,
+          barPercentage: 0.7,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          ticks: { color: '#938f99', font: { size: 11 } },
+          grid: { color: chartColors.grid },
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'W', color: '#938f99' },
+          ticks: { color: '#938f99' },
+          grid: { color: chartColors.grid },
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#e6e0e9', usePointStyle: true, pointStyle: 'rectRounded', padding: 16 } },
+        tooltip: {
+          backgroundColor: '#2b2830ee',
+          titleColor: '#e6e0e9',
+          bodyColor: '#cac4d0',
+          borderColor: '#49454f',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 12,
+        }
+      }
+    }
+  });
+}
+
+function renderDailyChart(labels, kwh) {
+  if (charts.daily) charts.daily.destroy();
+  charts.daily = new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '日耗电 (kWh)',
+        data: kwh,
+        backgroundColor: '#a8d5a2aa',
+        borderColor: '#a8d5a2',
+        borderWidth: 1,
+        borderRadius: 6,
+        barPercentage: 0.6,
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { ticks: { color: '#938f99' }, grid: { color: chartColors.grid } },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'kWh', color: '#938f99' },
+          ticks: { color: '#938f99' },
+          grid: { color: chartColors.grid },
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#2b2830ee', titleColor: '#e6e0e9', bodyColor: '#cac4d0', borderColor: '#49454f', borderWidth: 1, padding: 12, cornerRadius: 12 }
+      }
+    }
+  });
+}
+
+function renderTempChart(labels, data) {
+  if (charts.temp) charts.temp.destroy();
+  charts.temp = new Chart(document.getElementById('tempChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '温度 (°C)',
+        data,
+        borderColor: chartColors.temp,
+        backgroundColor: chartColors.temp + '18',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        borderWidth: 1.8,
+        spanGaps: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { maxTicksLimit: 24, color: '#938f99' }, grid: { color: chartColors.grid } },
+        y: {
+          title: { display: true, text: '°C', color: '#938f99' },
+          ticks: { color: '#938f99' },
+          grid: { color: chartColors.grid },
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
