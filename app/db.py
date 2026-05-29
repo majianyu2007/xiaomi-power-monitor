@@ -288,8 +288,8 @@ class PowerDB:
             "valley_rate": valley_rate,
         }
 
-    def get_standby_stats(self, device_id: str, threshold_w: float = 5.0) -> dict:
-        """待机检测 — kWh 按实际间隔计算"""
+    def get_standby_stats(self, device_id: str, threshold_w: float = 5.0, days: int = 30) -> dict:
+        """待机检测 — kWh 按实际间隔计算，默认统计近30天"""
         interval_hours = self.collect_interval / 3600.0
         with self._conn() as conn:
             row = conn.execute("""
@@ -300,8 +300,8 @@ class PowerDB:
                     ROUND(AVG(CASE WHEN reachable=1 AND power_on=1 AND power_w IS NOT NULL AND power_w < ? THEN power_w END), 1) as avg_standby_w,
                     COUNT(*) as total
                 FROM power_readings
-                WHERE device_id=?
-            """, (threshold_w, threshold_w, threshold_w, interval_hours, threshold_w, device_id)).fetchone()
+                WHERE device_id=? AND timestamp >= datetime('now', ?, '+8 hours')
+            """, (threshold_w, threshold_w, threshold_w, interval_hours, threshold_w, device_id, f"-{days} days")).fetchone()
 
         if not row:
             return {"standby_points": 0, "active_points": 0, "standby_kwh": 0,

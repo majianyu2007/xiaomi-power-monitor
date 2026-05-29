@@ -199,8 +199,8 @@ def api_cost(device_id: str, days: int = 30):
 
 
 @app.get("/api/stats/{device_id}/standby")
-def api_standby(device_id: str):
-    return db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD)
+def api_standby(device_id: str, days: int = 30):
+    return db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD, days=days)
 
 
 @app.get("/api/stats/{device_id}/peak")
