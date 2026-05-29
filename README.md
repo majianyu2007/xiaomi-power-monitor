@@ -63,7 +63,7 @@ python3 -m micloud
 | `PLUG_IP` | `192.168.10.203` | 单插座 IP（多设备时忽略） |
 | `PLUG_TOKEN` | (无) | 单插座 Token |
 | `DEVICES_JSON` | (空) | 多设备 JSON 配置 |
-| `COLLECT_INTERVAL` | `60` | 采集间隔（秒） |
+| `COLLECT_INTERVAL` | `60` | 采集间隔（秒，最低5） |
 | `DB_PATH` | `/data/power_data.db` | 数据库路径 |
 | `PORT` | `8080` | Web 服务端口 |
 | `DEFAULT_MODEL` | `cuco.plug.v3` | 默认设备型号 |
