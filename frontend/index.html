@@ -7,627 +7,78 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 <style>
-:root{--bg:#f5f5f9;--bg-card:#fff;--bg-card-hover:#f8f8fc;--bg-surface:#eee;--text:#1a1a2e;--text-secondary:#666;--text-tertiary:#999;--accent:#6750a4;--accent-light:#e8def8;--accent-text:#4f378b;--warning:#ed6c02;--warning-bg:#fff3e0;--success:#2e7d32;--success-light:#e8f5e9;--error:#c62828;--radius:12px;--radius-lg:16px;--font-mono:'SF Mono',Consolas,'Liberation Mono',Menlo,monospace;--hm1:#c8e6c9;--hm2:#fff9c4;--hm3:#ffcc80;--hm4:#ef9a9a}
-[data-theme="dark"]{--bg:#121212;--bg-card:#1e1e1e;--bg-card-hover:#2a2a2a;--bg-surface:#2c2c2c;--text:#e6e1e5;--text-secondary:#a0a0a0;--text-tertiary:#666;--accent:#d0bcff;--accent-light:#381e72;--accent-text:#efb8ff;--warning:#ffb74d;--warning-bg:#3e2723;--success:#66bb6a;--success-light:#1b5e20;--error:#ef5350;--hm1:#2e7d32;--hm2:#f9a825;--hm3:#e65100;--hm4:#b71c1c}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
-.container{max-width:960px;margin:0 auto;padding:12px}
-.header{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;margin-bottom:8px}
-.header h1{font-size:1.2rem;font-weight:700;display:flex;align-items:center;gap:8px}
-.header h1 .live-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px #4caf50;animation:pulse 2s infinite}
-.header h1 .live-dot.offline{background:#999;box-shadow:none;animation:none}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.header-actions{display:flex;gap:4px;align-items:center}
-.header-actions button{background:var(--bg-surface);border:none;color:var(--text);font-size:.8rem;padding:4px 10px;border-radius:8px;cursor:pointer;transition:all .2s}
-.header-actions button:hover{background:var(--accent-light);color:var(--accent-text)}
-.header-actions button.active{background:var(--accent);color:#fff}
-.header-actions .clock{font-size:.78rem;color:var(--text-secondary);margin-right:4px;font-family:var(--font-mono)}
-
-/* Range Selector */
-.range-bar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
-.range-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--bg-surface);background:var(--bg-card);color:var(--text);font-size:.82rem;cursor:pointer;transition:all .2s;white-space:nowrap}
-.range-btn:hover{border-color:var(--accent);color:var(--accent)}
-.range-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.custom-range{display:none;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
-.custom-range.show{display:flex}
-.custom-range input[type="date"]{padding:4px 8px;border-radius:8px;border:1px solid var(--bg-surface);background:var(--bg-card);color:var(--text);font-size:.82rem}
-.custom-range .apply-btn{padding:6px 16px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:.82rem;cursor:pointer}
-.custom-range .apply-btn:hover{opacity:.9}
-
-/* Device Tabs */
-.device-tabs{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
-.device-tab{padding:8px 16px;border-radius:var(--radius-lg);cursor:pointer;background:var(--bg-card);border:1px solid var(--bg-surface);font-size:.88rem;transition:all .2s;display:flex;align-items:center;gap:6px}
-.device-tab:hover{background:var(--bg-card-hover)}
-.device-tab.active{background:var(--accent-light);color:var(--accent-text);border-color:var(--accent)}
-
-.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-@media(min-width:640px){.stats-grid{grid-template-columns:repeat(6,1fr)}}
-.stat-card{background:var(--bg-card);border-radius:var(--radius);padding:12px 10px;text-align:center;border:1px solid var(--bg-surface)}
-.stat-card.accent{border-color:var(--accent);background:linear-gradient(135deg,var(--accent-light),var(--bg-card))}
-.stat-card.warning{border-color:var(--warning)}
-.stat-card.success{border-color:var(--success);background:linear-gradient(135deg,var(--success-light),var(--bg-card))}
-.stat-value{font-size:1.3rem;font-weight:700;font-family:var(--font-mono);margin-bottom:2px}
-.stat-unit{font-size:.6rem;color:var(--text-secondary);font-weight:400;margin-left:2px}
-.stat-label{font-size:.72rem;color:var(--text-secondary)}
-
-.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:700px){.section-grid{grid-template-columns:1fr}}
-.section-col{display:flex;flex-direction:column;gap:10px}
-.card{background:var(--bg-card);border-radius:var(--radius);padding:14px 16px;border:1px solid var(--bg-surface)}
-.card-title{font-size:.88rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.badge{font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:500}
-.chart-wrap{position:relative;width:100%;min-height:120px}
-.chart-wrap canvas{width:100%!important}
-
-/* Cost */
-.cost-big{text-align:center;padding:8px 0}
-.cost-big .cost-label{font-size:.82rem;color:var(--text-secondary)}
-.cost-big .cost-value{font-size:2rem;font-weight:800;font-family:var(--font-mono);color:var(--accent)}
-.cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.cost-item{background:var(--bg-surface);border-radius:8px;padding:8px 10px;text-align:center}
-.cost-item .cost-label{font-size:.7rem;color:var(--text-secondary)}
-.cost-item .cost-value{font-size:1.05rem;font-weight:700;font-family:var(--font-mono)}
-
-/* Standby */
-.standby-bar{height:8px;border-radius:4px;background:var(--bg-surface);overflow:hidden;margin-top:8px}
-.standby-fill{height:100%;border-radius:4px;transition:width .5s ease;background:linear-gradient(90deg,var(--warning),var(--error))}
-
-/* Heatmap */
-.heatmap-container{overflow-x:auto}
-.heatmap-table{border-collapse:collapse;font-size:.62rem;font-family:var(--font-mono);width:100%}
-.heatmap-table th,.heatmap-table td{width:14px;height:14px;text-align:center;padding:1px;border-radius:2px;min-width:14px}
-.heatmap-table th{color:var(--text-secondary);font-weight:400;font-size:.6rem}
-.heatmap-table td{color:rgba(255,255,255,.9);font-weight:600}
-.heatmap-table td.empty{background:var(--bg-surface);color:transparent}
-.heatmap-legend{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px;font-size:.7rem;color:var(--text-secondary)}
-.heatmap-legend i{display:inline-block;width:20px;height:10px;border-radius:3px}
-
-.empty-state{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:1rem}
-.empty-state .icon{font-size:2.5rem;margin-bottom:10px}
-
-.footer{text-align:center;padding:12px;color:var(--text-tertiary);font-size:.72rem}
+:root{color-scheme:light;--md-sys-color-primary:#6750a4;--md-sys-color-on-primary:#fff;--md-sys-color-primary-container:#eaddff;--md-sys-color-on-primary-container:#21005d;--md-sys-color-secondary:#625b71;--md-sys-color-secondary-container:#e8def8;--md-sys-color-tertiary:#7d5260;--md-sys-color-tertiary-container:#ffd8e4;--md-sys-color-error:#ba1a1a;--md-sys-color-error-container:#ffdad6;--md-sys-color-surface:#fffbfe;--md-sys-color-surface-dim:#ded8e1;--md-sys-color-surface-container-low:#f7f2fa;--md-sys-color-surface-container:#f3edf7;--md-sys-color-surface-container-high:#ece6f0;--md-sys-color-on-surface:#1c1b1f;--md-sys-color-on-surface-variant:#49454f;--md-sys-color-outline:#79747e;--md-sys-color-outline-variant:#cac4d0;--md-sys-color-success:#1f7a3f;--md-sys-color-success-container:#c6f0cd;--md-sys-color-warning:#8a5100;--md-sys-color-warning-container:#ffddb0;--bg:linear-gradient(135deg,#fffbfe 0%,#f7f2fa 42%,#eef4ff 100%);--radius-xs:10px;--radius-sm:14px;--radius-md:20px;--radius-lg:28px;--radius-xl:34px;--shadow-1:0 1px 2px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.05);--shadow-2:0 2px 6px rgba(0,0,0,.10),0 8px 22px rgba(103,80,164,.08);--font-mono:"SF Mono",Consolas,"Liberation Mono",Menlo,monospace;--hm1:#d0f8ce;--hm2:#fff8bd;--hm3:#ffd8a8;--hm4:#ffb4ab}
+[data-theme="dark"]{color-scheme:dark;--md-sys-color-primary:#d0bcff;--md-sys-color-on-primary:#381e72;--md-sys-color-primary-container:#4f378b;--md-sys-color-on-primary-container:#eaddff;--md-sys-color-secondary:#ccc2dc;--md-sys-color-secondary-container:#4a4458;--md-sys-color-tertiary:#efb8c8;--md-sys-color-tertiary-container:#633b48;--md-sys-color-error:#ffb4ab;--md-sys-color-error-container:#93000a;--md-sys-color-surface:#141218;--md-sys-color-surface-dim:#141218;--md-sys-color-surface-container-low:#1d1b20;--md-sys-color-surface-container:#211f26;--md-sys-color-surface-container-high:#2b2930;--md-sys-color-on-surface:#e6e0e9;--md-sys-color-on-surface-variant:#cac4d0;--md-sys-color-outline:#938f99;--md-sys-color-outline-variant:#49454f;--md-sys-color-success:#8dd7a5;--md-sys-color-success-container:#1f4d31;--md-sys-color-warning:#ffb95c;--md-sys-color-warning-container:#5f3800;--bg:radial-gradient(circle at top left,rgba(208,188,255,.16),transparent 28%),linear-gradient(135deg,#141218 0%,#1d1b20 62%,#111827 100%);--shadow-1:0 1px 2px rgba(0,0,0,.35);--shadow-2:0 6px 24px rgba(0,0,0,.32);--hm1:#245f34;--hm2:#8a6f00;--hm3:#a34d00;--hm4:#93000a}
+*{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}body{min-height:100vh;background:var(--bg);background-attachment:fixed;color:var(--md-sys-color-on-surface);font-family:Roboto,"Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5}.container{width:min(1440px,100%);margin:0 auto;padding:18px clamp(12px,2.4vw,32px) 28px}.top-app-bar{position:sticky;top:0;z-index:10;margin:-18px calc(clamp(12px,2.4vw,32px) * -1) 18px;padding:14px clamp(12px,2.4vw,32px);display:flex;align-items:center;justify-content:space-between;gap:14px;background:color-mix(in srgb,var(--md-sys-color-surface) 82%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--md-sys-color-outline-variant)}.brand{display:flex;align-items:center;gap:12px;min-width:0}.brand-icon{width:42px;height:42px;border-radius:16px;display:grid;place-items:center;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);box-shadow:var(--shadow-1);font-size:1.3rem}.brand h1{font-size:clamp(1.1rem,2vw,1.55rem);font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand p{font-size:.78rem;color:var(--md-sys-color-on-surface-variant)}.header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.clock{font-family:var(--font-mono);font-size:.86rem;color:var(--md-sys-color-on-surface-variant);padding:8px 12px;border-radius:999px;background:var(--md-sys-color-surface-container)}.refresh-toggle{border:0;cursor:pointer;padding:8px 12px;border-radius:999px;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-primary-container);font-size:.82rem;font-weight:800}.refresh-toggle.paused{background:var(--md-sys-color-warning-container);color:var(--md-sys-color-warning)}.segmented{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--md-sys-color-surface-container-high);border:1px solid var(--md-sys-color-outline-variant)}button{font:inherit}.segmented button,.range-btn{border:0;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,transform .2s}.segmented button{padding:7px 12px;border-radius:999px;color:var(--md-sys-color-on-surface-variant);background:transparent;font-size:.82rem}.segmented button.active{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);box-shadow:var(--shadow-1)}.control-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;margin-bottom:16px}.device-tabs,.range-bar{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:thin}.device-tab{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 16px;border-radius:999px;background:var(--md-sys-color-surface-container-low);border:1px solid var(--md-sys-color-outline-variant);color:var(--md-sys-color-on-surface-variant);cursor:pointer;box-shadow:var(--shadow-1);transition:all .2s}.device-tab:hover,.range-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-2)}.device-tab.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-primary-container);border-color:var(--md-sys-color-primary)}.live-dot{width:9px;height:9px;border-radius:999px;background:#24c95a;box-shadow:0 0 0 5px rgba(36,201,90,.14),0 0 12px rgba(36,201,90,.8);animation:pulse 2s infinite}.live-dot.offline{background:var(--md-sys-color-outline);box-shadow:none;animation:none}@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.88)}}.range-shell{padding:8px;border-radius:var(--radius-lg);background:var(--md-sys-color-surface-container-low);border:1px solid var(--md-sys-color-outline-variant);box-shadow:var(--shadow-1)}.range-bar{padding:0;overflow-x:visible;flex-wrap:wrap}.range-btn{padding:9px 15px;border-radius:999px;background:transparent;color:var(--md-sys-color-on-surface-variant);font-size:.86rem}.range-btn.active{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);box-shadow:var(--shadow-1)}.custom-range{display:none;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}.custom-range.show{display:flex}.custom-range input{height:38px;padding:0 12px;border-radius:999px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface)}.apply-btn{height:38px;padding:0 18px;border-radius:999px;border:0;background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);cursor:pointer}.hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(260px,1.15fr) minmax(300px,1fr);gap:16px;margin-bottom:16px}.hero-main,.status-panel,.card,.stat-card,.insight-card{border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-low);box-shadow:var(--shadow-1)}.hero-main{border-radius:var(--radius-xl);padding:24px;min-height:230px;background:linear-gradient(135deg,var(--md-sys-color-primary-container),var(--md-sys-color-surface-container-low) 72%)}.eyebrow{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:700;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;letter-spacing:.08em}.hero-value{display:flex;align-items:flex-end;gap:12px;margin:18px 0 6px}.hero-value .num{font-family:var(--font-mono);font-size:clamp(3rem,8vw,6rem);line-height:.88;font-weight:900;letter-spacing:-.08em;color:var(--md-sys-color-on-primary-container)}.hero-value .unit{font-size:1.25rem;font-weight:700;color:var(--md-sys-color-on-surface-variant);padding-bottom:8px}.hero-sub{font-size:1rem;color:var(--md-sys-color-on-surface-variant)}.hero-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}.hero-metric{padding:12px;border-radius:18px;background:color-mix(in srgb,var(--md-sys-color-surface) 72%,transparent);border:1px solid color-mix(in srgb,var(--md-sys-color-outline-variant) 75%,transparent)}.hero-metric b{display:block;font-family:var(--font-mono);font-size:1.1rem}.hero-metric span{font-size:.75rem;color:var(--md-sys-color-on-surface-variant)}.status-panel{border-radius:var(--radius-xl);padding:20px;display:grid;align-content:start;gap:14px}.status-row{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant)}.status-row:last-child{border-bottom:0}.status-row span{font-size:.8rem;color:var(--md-sys-color-on-surface-variant)}.status-row b{font-family:var(--font-mono);font-size:.95rem;text-align:right}.health-chip{justify-self:end;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;background:var(--md-sys-color-success-container);color:var(--md-sys-color-success);font-weight:800}.health-chip.warn{background:var(--md-sys-color-warning-container);color:var(--md-sys-color-warning)}.health-chip.error{background:var(--md-sys-color-error-container);color:var(--md-sys-color-error)}.stats-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat-card{border-radius:var(--radius-lg);padding:16px;min-height:118px;display:flex;flex-direction:column;justify-content:space-between}.stat-card.accent{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}.stat-card.warning{background:var(--md-sys-color-warning-container);color:var(--md-sys-color-warning);border-color:transparent}.stat-card.success{background:var(--md-sys-color-success-container);color:var(--md-sys-color-success);border-color:transparent}.stat-label{font-size:.78rem;color:color-mix(in srgb,currentColor 76%,var(--md-sys-color-on-surface-variant));font-weight:700}.stat-value{font-family:var(--font-mono);font-size:clamp(1.25rem,2.4vw,1.85rem);font-weight:900;line-height:1.1;letter-spacing:-.04em}.stat-unit{font-size:.72rem;font-weight:700;margin-left:4px;letter-spacing:0}.stat-foot{font-size:.72rem;color:color-mix(in srgb,currentColor 70%,transparent);margin-top:8px}.insight-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.insight-card{border-radius:var(--radius-lg);padding:16px;min-height:120px}.insight-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.82rem;font-weight:800;color:var(--md-sys-color-on-surface-variant);margin-bottom:10px}.insight-value{font-family:var(--font-mono);font-size:1.6rem;font-weight:900;color:var(--md-sys-color-on-surface);letter-spacing:-.04em}.insight-caption{font-size:.78rem;color:var(--md-sys-color-on-surface-variant);margin-top:6px}.meter{height:10px;border-radius:999px;background:var(--md-sys-color-surface-container-high);overflow:hidden;margin-top:12px}.meter i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--md-sys-color-primary),var(--md-sys-color-tertiary));transition:width .4s}.section-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.85fr);gap:16px}.section-col{display:flex;flex-direction:column;gap:16px}.card{border-radius:var(--radius-lg);padding:18px;overflow:hidden}.card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-weight:900;letter-spacing:-.01em}.card-title-main{display:flex;align-items:center;gap:8px}.badge{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:800;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-primary-container);white-space:nowrap}.chart-wrap{position:relative;width:100%;min-height:180px}.chart-wrap canvas{width:100%!important}.cost-big{padding:8px 0 14px}.cost-label{font-size:.78rem;color:var(--md-sys-color-on-surface-variant);font-weight:700}.cost-value{font-family:var(--font-mono);font-size:2.2rem;font-weight:900;color:var(--md-sys-color-primary);letter-spacing:-.05em}.cost-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.cost-item{padding:12px;border-radius:16px;background:var(--md-sys-color-surface-container);border:1px solid var(--md-sys-color-outline-variant)}.cost-item .cost-value{font-size:1.1rem;color:var(--md-sys-color-on-surface)}.standby-bar{height:12px;border-radius:999px;background:var(--md-sys-color-surface-container-high);overflow:hidden;margin-top:10px}.standby-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--md-sys-color-warning),var(--md-sys-color-error));transition:width .5s}.heatmap-container{overflow-x:auto;padding-bottom:4px}.heatmap-table{border-collapse:separate;border-spacing:3px;font-size:.62rem;font-family:var(--font-mono);width:100%}.heatmap-table th,.heatmap-table td{height:18px;min-width:18px;text-align:center;border-radius:5px;padding:1px}.heatmap-table th{color:var(--md-sys-color-on-surface-variant);font-weight:700;font-size:.58rem}.heatmap-table td{font-weight:800}.heatmap-legend{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:8px;font-size:.72rem;color:var(--md-sys-color-on-surface-variant)}.heatmap-legend i{display:inline-block;width:28px;height:10px;border-radius:999px}.empty-state{text-align:center;padding:76px 20px;color:var(--md-sys-color-on-surface-variant);font-size:1rem;border-radius:var(--radius-xl);background:var(--md-sys-color-surface-container-low);border:1px solid var(--md-sys-color-outline-variant)}.empty-state .icon{font-size:3rem;margin-bottom:10px}.footer{text-align:center;padding:16px 12px 4px;color:var(--md-sys-color-on-surface-variant);font-size:.75rem}@media(max-width:1100px){.hero,.section-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(3,1fr)}.insight-grid{grid-template-columns:repeat(2,1fr)}.control-panel{grid-template-columns:1fr}}@media(max-width:680px){.top-app-bar{position:static;align-items:flex-start;flex-direction:column}.header-actions{width:100%;justify-content:space-between}.hero-main{padding:20px}.hero-metrics,.stats-grid,.insight-grid{grid-template-columns:1fr 1fr}.status-row{grid-template-columns:1fr}.status-row b{text-align:left}.stat-card{min-height:104px}.cost-grid{grid-template-columns:1fr}.brand h1{white-space:normal}}@media(max-width:420px){.hero-metrics,.stats-grid,.insight-grid{grid-template-columns:1fr}.range-btn{padding:8px 12px}}
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header">
-    <h1><span>⚡ 小米插座功耗监控</span><span class="live-dot" id="globalDot"></span></h1>
-    <div class="header-actions">
-      <span class="clock" id="clock"></span>
-      <div id="themeSwitch" style="display:inline-flex;gap:2px">
-        <button data-val="auto" class="active">自动</button>
-        <button data-val="light">☀️</button>
-        <button data-val="dark">🌙</button>
-      </div>
+  <div class="top-app-bar">
+    <div class="brand"><div class="brand-icon">⚡</div><div><h1>小米插座功耗监控</h1><p>Material Design 3 · 实时观测与能耗分析</p></div></div>
+    <div class="header-actions"><span class="clock" id="clock">--:--:--</span><button class="refresh-toggle" id="refreshToggle" type="button">自动刷新</button><div id="themeSwitch" class="segmented"><button data-val="auto" class="active">自动</button><button data-val="light">☀️</button><button data-val="dark">🌙</button></div></div>
+  </div>
+  <div class="control-panel">
+    <div class="device-tabs" id="deviceTabs"></div>
+    <div class="range-shell">
+      <div class="range-bar" id="rangeBar"><button class="range-btn active" data-range="today">今日</button><button class="range-btn" data-range="7d">7天</button><button class="range-btn" data-range="30d">30天</button><button class="range-btn" data-range="90d">90天</button><button class="range-btn" data-range="year">今年</button><button class="range-btn" data-range="custom">自定义</button></div>
+      <div class="custom-range" id="customRange"><input type="date" id="startDate" title="开始日期"><span style="color:var(--md-sys-color-on-surface-variant);font-size:.85rem">~</span><input type="date" id="endDate" title="结束日期"><button class="apply-btn" onclick="applyCustomRange()">查询</button></div>
     </div>
   </div>
-  <div class="device-tabs" id="deviceTabs"></div>
-  <div class="range-bar" id="rangeBar">
-    <button class="range-btn active" data-range="today">今日</button>
-    <button class="range-btn" data-range="7d">7天</button>
-    <button class="range-btn" data-range="30d">30天</button>
-    <button class="range-btn" data-range="90d">90天</button>
-    <button class="range-btn" data-range="year">今年</button>
-    <button class="range-btn" data-range="custom">自定义</button>
-  </div>
-  <div class="custom-range" id="customRange">
-    <input type="date" id="startDate" title="开始日期">
-    <span style="color:var(--text-secondary);font-size:.85rem">~</span>
-    <input type="date" id="endDate" title="结束日期">
-    <button class="apply-btn" onclick="applyCustomRange()">查询</button>
-  </div>
-  <div id="mainContent">
-    <div class="empty-state"><div class="icon">🔌</div><div>加载中...</div></div>
-  </div>
+  <div id="mainContent"><div class="empty-state"><div class="icon">🔌</div><div>加载中...</div></div></div>
 </div>
-<div class="footer">小米插座功耗监控 · 数据每分钟自动采集 · 页面自动刷新</div>
-
+<div class="footer">小米插座功耗监控 · 数据每分钟自动采集 · 页面每 30 秒刷新</div>
 <script>
 const API = location.origin;
 let currentDevice = null;
 let currentRange = 'today';
 let chartInstances = {};
-
-// ===== Theme =====
-function getTheme() { return localStorage.getItem('pm_theme') || 'auto'; }
-function applyTheme(val) {
-  localStorage.setItem('pm_theme', val);
-  let resolved = val === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : val;
-  document.documentElement.setAttribute('data-theme', resolved);
-  document.querySelectorAll('#themeSwitch button').forEach(b => b.classList.toggle('active', b.dataset.val === val));
-  Object.values(chartInstances).forEach(c => {
-    if (c?.options?.scales) {
-      const tc = resolved === 'dark' ? '#cac4d0' : '#6e6e80';
-      const gc = resolved === 'dark' ? '#38353e' : '#e7e0ec';
-      if (c.options.scales.x) { c.options.scales.x.ticks.color = tc; c.options.scales.x.grid.color = gc; }
-      if (c.options.scales.y) { c.options.scales.y.ticks.color = tc; c.options.scales.y.grid.color = gc; }
-      c.update('none');
-    }
-  });
-}
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (getTheme() === 'auto') applyTheme('auto'); });
-document.querySelectorAll('#themeSwitch button').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.val)));
-applyTheme(getTheme());
-
-function fmt(n, d=1) { return n != null ? Number(n).toFixed(d) : '--'; }
-function fmtYuan(n) { return n != null ? '¥' + Number(n).toFixed(2) : '--'; }
-function fmtDate(d) { return d.substring(5); }
-function fmtMonth(m) { return m.substring(5); }
-
-function updateTime() {
-  const now = new Date();
-  document.getElementById('clock').textContent = now.toLocaleTimeString('zh-CN', { hour12: false });
-}
-
-// ===== Range Selector =====
-document.querySelectorAll('.range-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentRange = btn.dataset.range;
-    document.getElementById('customRange').classList.toggle('show', currentRange === 'custom');
-    if (currentDevice) refresh(currentDevice);
-  });
-});
-
-function applyCustomRange() {
-  if (currentDevice) refresh(currentDevice);
-}
-
-function getRangeParams() {
-  const today = new Date();
-  const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0');
-  const todayStr = `${y}-${m}-${d}`;
-  const addDays = (dt, n) => { const r = new Date(dt); r.setDate(r.getDate()+n); return r; };
-  const fmt = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-
-  switch(currentRange) {
-    case 'today':
-      return { type: 'day', date: todayStr, start: todayStr, end: todayStr };
-    case '7d':
-      return { type: 'range', days: 7, start: fmt(addDays(today, -6)), end: todayStr };
-    case '30d':
-      return { type: 'range', days: 30, start: fmt(addDays(today, -29)), end: todayStr };
-    case '90d':
-      return { type: 'range', days: 90, start: fmt(addDays(today, -89)), end: todayStr };
-    case 'year':
-      return { type: 'year', start: `${y}-01-01`, end: todayStr };
-    case 'custom': {
-      const s = document.getElementById('startDate').value;
-      const e = document.getElementById('endDate').value;
-      if (!s || !e) return { type: 'day', date: todayStr, start: todayStr, end: todayStr };
-      return { type: 'range', days: Math.round((new Date(e)-new Date(s))/86400000)+1, start: s, end: e };
-    }
-    default:
-      return { type: 'day', date: todayStr, start: todayStr, end: todayStr };
-  }
-}
-
-// ===== Device Tabs =====
-async function init() {
-  try {
-    const res = await fetch(`${API}/api/devices`);
-    const devices = await res.json();
-    if (!devices.length) {
-      document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">🔌</div><div>未配置设备</div></div>';
-      return;
-    }
-    renderDeviceTabs(devices);
-    switchDevice(devices[0].device_id);
-  } catch(e) { console.error('Init failed:', e); document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>加载失败，请刷新重试</div></div>'; }
-  setInterval(() => { if (currentDevice) refresh(currentDevice); }, 30000);
-  updateTime();
-  setInterval(updateTime, 1000);
-}
-
-function renderDeviceTabs(devices) {
-  const el = document.getElementById('deviceTabs');
-  el.innerHTML = devices.map(d => {
-    const safeName = (d.name || d.device_id).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]||c));
-    const safeId = d.device_id.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]||c));
-    return `<div class="device-tab" data-id="${safeId}" onclick="switchDevice('${safeId}')">
-      <span class="live-dot" id="dot_${safeId}"></span>${safeName}
-    </div>`;
-  });
-}
-
-async function switchDevice(deviceId) {
-  currentDevice = deviceId;
-  document.querySelectorAll('.device-tab').forEach(t => t.classList.toggle('active', t.dataset.id === deviceId));
-  await refresh(deviceId);
-}
-
-async function refresh(deviceId) {
-  try {
-    const rp = getRangeParams();
-    const sid = encodeURIComponent(deviceId);
-
-    // Determine dashboard view param from range type
-    let viewParam;
-    if (rp.type === 'day') viewParam = 'today';
-    else if (rp.type === 'year') viewParam = 'year';
-    else viewParam = 'range';
-
-    // Single aggregated API call
-    const url = `${API}/api/dashboard/${sid}?view=${viewParam}&start_date=${rp.start}&end_date=${rp.end}`;
-    const data = await fetch(url).then(r => r.json());
-
-    // Update live dot
-    const latest = data.latest || {};
-    const config = data.config || {};
-    const dot = document.getElementById('dot_' + deviceId) || document.getElementById('globalDot');
-    if (dot) dot.className = latest.reachable ? 'live-dot' : 'live-dot offline';
-    const globalDot = document.getElementById('globalDot');
-    if (globalDot) globalDot.className = latest.reachable ? 'live-dot' : 'live-dot offline';
-
-    let statsHtml = '';
-    let chartsHtml = '';
-
-    if (rp.type === 'day') {
-      // === Day view ===
-      const today = data.today_stats || {};
-      const readings = data.readings || [];
-      const hourly = data.hourly || [];
-      const peak = data.peak || {};
-      const cost = data.cost || {};
-      const on = latest.power_on;
-      const online = latest.reachable;
-      const dateLabel = rp.date === new Date().toISOString().slice(0,10) ? '今日' : rp.date;
-
-      statsHtml = buildStatsCards(latest, today, online, on, dateLabel);
-      chartsHtml = `
-      <div class="section-col">
-        <div class="card"><div class="card-title">📊 ${dateLabel}实时功率</div><div class="chart-wrap"><canvas id="chartLive" height="180"></canvas></div></div>
-        <div class="card"><div class="card-title">📈 功率分布 (min / avg / max)</div><div class="chart-wrap"><canvas id="chartHourly" height="160"></canvas></div></div>
-      </div>
-      <div class="section-col">
-        ${peak && peak.peak_w ? `<div class="card" style="border-color:var(--warning);background:var(--warning-bg)">
-          <div class="card-title">⚡ ${dateLabel}峰值</div>
-          <div style="font-size:1.5rem;font-weight:700;font-family:var(--font-mono);color:var(--warning)">${fmt(peak.peak_w)}W</div>
-          <div style="color:var(--text-secondary);font-size:.8rem;margin-top:4px">${peak.timestamp ? peak.timestamp.split(' ')[1] : ''} · 均值 ${fmt(peak.avg_w)}W · <span style="color:var(--error)">${fmt(peak.multiplier)}x</span></div>
-        </div>` : ''}
-        <div class="card"><div class="card-title">🌡️ 温度趋势</div><div class="chart-wrap"><canvas id="chartTemp" height="120"></canvas></div></div>
-        ${buildCostCard(cost, config)}
-      </div>`;
-
-      document.getElementById('mainContent').innerHTML = `
-        ${statsHtml}
-        <div class="section-grid">${chartsHtml}</div>`;
-
-      paintLiveChart(readings);
-      paintHourlyChart(hourly);
-      paintTempChart(hourly);
-
-    } else if (rp.type === 'year') {
-      // === Year view ===
-      const monthly = data.monthly || [];
-      const cost = data.cost || {};
-
-      statsHtml = buildRangeStats(latest, cost, rp.start, rp.end);
-      chartsHtml = `
-      <div class="section-col">
-        <div class="card"><div class="card-title">📅 月度用电趋势 (kWh)</div><div class="chart-wrap"><canvas id="chartMonthly" height="200"></canvas></div></div>
-        <div class="card"><div class="card-title">📈 月度功率 (W)</div><div class="chart-wrap"><canvas id="chartMonthlyPower" height="160"></canvas></div></div>
-      </div>
-      <div class="section-col">
-        ${buildCostCard(cost, config)}
-        <div class="card"><div class="card-title">🌡️ 月均温度</div><div class="chart-wrap"><canvas id="chartMonthlyTemp" height="140"></canvas></div></div>
-      </div>`;
-
-      document.getElementById('mainContent').innerHTML = `
-        ${statsHtml}
-        <div class="section-grid">${chartsHtml}</div>`;
-
-      paintMonthlyChart(monthly);
-      paintMonthlyPowerChart(monthly);
-      paintMonthlyTempChart(monthly);
-
-    } else {
-      // === Range view (7d, 30d, 90d, custom) ===
-      const daily = data.daily || [];
-      const cost = data.cost || {};
-      const standby = data.standby || {};
-      const heatmap = data.heatmap || [];
-
-      statsHtml = buildRangeStats(latest, cost, rp.start, rp.end);
-      chartsHtml = `
-      <div class="section-col">
-        <div class="card"><div class="card-title">📅 每日用电 (${fmtDate(rp.start)} ~ ${fmtDate(rp.end)})</div><div class="chart-wrap"><canvas id="chartDaily" height="180"></canvas></div></div>
-        <div class="card"><div class="card-title">🌡️ 功率热力图</div><div class="heatmap-container" id="heatmapContainer"></div>
-          <div class="heatmap-legend"><span>低</span><i style="background:var(--hm1)"></i><i style="background:var(--hm2)"></i><i style="background:var(--hm3)"></i><i style="background:var(--hm4)"></i><span>高</span></div>
-        </div>
-      </div>
-      <div class="section-col">
-        ${buildCostCard(cost, config)}
-        <div class="card">
-          <div class="card-title">💤 待机分析 <span class="badge" style="background:var(--bg-surface);color:var(--text-secondary)">&lt;${standby.threshold_w || 5}W</span></div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-            <span style="font-size:.85rem;color:var(--text-secondary)">待机占比</span>
-            <span class="mono" style="font-size:1.1rem;font-weight:700;color:var(--warning)">${fmt(standby.standby_pct, 0)}%</span>
-          </div>
-          <div class="standby-bar"><div class="standby-fill" style="width:${standby.standby_pct || 0}%"></div></div>
-          <div style="margin-top:8px;font-size:.78rem;color:var(--text-tertiary)">
-            待机 ${fmt(standby.avg_standby_w)}W · ${fmt(standby.standby_kwh, 3)}kWh · ${fmt(standby.standby_points)}个采样点
-          </div>
-        </div>
-      </div>`;
-
-      document.getElementById('mainContent').innerHTML = `
-        ${statsHtml}
-        <div class="section-grid">${chartsHtml}</div>`;
-
-      paintDailyChart(daily);
-      paintHeatmap(heatmap);
-    }
-
-  } catch(e) { console.error('Refresh failed:', e); }
-}
-
-// ===== Stats Cards =====
-function buildStatsCards(d, today, online, on, label) {
-  return `<div class="stats-grid">
-    <div class="stat-card accent">
-      <div class="stat-value">${online ? (on ? fmt(d.power_w) : 'OFF') : '--'}${online && on ? '<span class="stat-unit">W</span>' : ''}</div>
-      <div class="stat-label">${online ? (on ? '实时功率' : '已关机') : '不可达'}</div>
-    </div>
-    <div class="stat-card"><div class="stat-value">${fmt(today.avg_power)}<span class="stat-unit">W</span></div><div class="stat-label">${label}均值</div></div>
-    <div class="stat-card"><div class="stat-value">${fmt(today.max_power)}<span class="stat-unit">W</span></div><div class="stat-label">${label}峰值</div></div>
-    <div class="stat-card warning"><div class="stat-value">${fmt(today.kwh_estimate, 3)}<span class="stat-unit">kWh</span></div><div class="stat-label">${label}用电</div></div>
-    <div class="stat-card"><div class="stat-value">${fmt(today.max_temp)}<span class="stat-unit">°C</span></div><div class="stat-label">最高温度</div></div>
-    <div class="stat-card success"><div class="stat-value">${fmt(today.uptime_pct, 0)}<span class="stat-unit">%</span></div><div class="stat-label">在线率</div></div>
-  </div>`;
-}
-
-function buildRangeStats(d, cost, start, end) {
-  const days = cost.days_covered || 1;
-  return `<div class="stats-grid">
-    <div class="stat-card accent">
-      <div class="stat-value">${d.reachable ? (d.power_on ? fmt(d.power_w) : 'OFF') : '--'}${d.reachable && d.power_on ? '<span class="stat-unit">W</span>' : ''}</div>
-      <div class="stat-label">${d.reachable ? '实时功率' : '不可达'}</div>
-    </div>
-    <div class="stat-card warning"><div class="stat-value">${fmt(cost.total_kwh, 2)}<span class="stat-unit">kWh</span></div><div class="stat-label">${days}天累计用电</div></div>
-    <div class="stat-card"><div class="stat-value">${fmtYuan(cost.total_cost)}</div><div class="stat-label">${days}天累计电费</div></div>
-    <div class="stat-card"><div class="stat-value">${fmtYuan(cost.daily_avg_cost)}</div><div class="stat-label">日均电费</div></div>
-    <div class="stat-card"><div class="stat-value">${fmt(cost.total_kwh / Math.max(days,1) * 1000, 1)}<span class="stat-unit">Wh</span></div><div class="stat-label">日均功耗</div></div>
-    <div class="stat-card"><div class="stat-value">${fmtDate(start)} ~ ${fmtDate(end)}</div><div class="stat-label">统计范围</div></div>
-  </div>`;
-}
-
-function buildCostCard(cost, config) {
-  return `<div class="card">
-    <div class="card-title">💰 电费估算 <span class="badge" style="background:var(--accent-light);color:var(--accent-text)">${cost.is_tou ? `${config.peak_rate}元/峰 · ${config.valley_rate}元/谷` : `${config.electricity_rate}元/度`}</span></div>
-    <div class="cost-big">
-      <div class="cost-label">累计电费 (近${cost.days_covered || 0}天)</div>
-      <div class="cost-value">${fmtYuan(cost.total_cost)}</div>
-    </div>
-    <div class="cost-grid" style="margin-top:10px">
-      ${cost.is_tou ? `
-      <div class="cost-item"><div class="cost-label">峰段用电</div><div class="cost-value">${fmt(cost.peak_kwh,3)}<span class="stat-unit">kWh</span></div></div>
-      <div class="cost-item"><div class="cost-label">谷段用电</div><div class="cost-value">${fmt(cost.valley_kwh,3)}<span class="stat-unit">kWh</span></div></div>
-      ` : `
-      <div class="cost-item"><div class="cost-label">累计用电</div><div class="cost-value">${fmt(cost.total_kwh,3)}<span class="stat-unit">kWh</span></div></div>
-      <div class="cost-item"><div class="cost-label">单价</div><div class="cost-value">${config.electricity_rate}<span class="stat-unit">元/度</span></div></div>
-      `}
-      <div class="cost-item"><div class="cost-label">日均电费</div><div class="cost-value">${fmtYuan(cost.daily_avg_cost)}</div></div>
-    </div>
-  </div>`;
-}
-
-// ===== Chart Theme Helpers =====
-function chartColors() {
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  return {
-    grid: dark ? '#38353e' : '#e7e0ec',
-    text: dark ? '#cac4d0' : '#6e6e80',
-    avg: dark ? 'rgba(208,188,255,0.7)' : 'rgba(103,80,164,0.6)',
-    avgBorder: dark ? '#b69df8' : '#6750a4',
-    max: dark ? 'rgba(239,83,80,0.6)' : 'rgba(229,57,53,0.5)',
-    maxBorder: dark ? '#ef5350' : '#c62828',
-    min: dark ? 'rgba(100,181,246,0.5)' : 'rgba(33,150,243,0.5)',
-    minBorder: dark ? '#64b5f6' : '#1e88e5',
-    temp: dark ? 'rgba(255,183,77,0.8)' : 'rgba(239,108,0,0.7)',
-    tempBorder: dark ? '#ffb74d' : '#ed6c02',
-    bar: dark ? 'rgba(103,80,164,0.5)' : 'rgba(103,80,164,0.4)',
-    barBorder: dark ? '#d0bcff' : '#6750a4',
-  };
-}
-
-function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
-
-function makeScales(showGrid=true) {
-  const c = chartColors();
-  return {
-    x: { ticks: { color: c.text, maxRotation: 45, font: { size: 10 } }, grid: { color: showGrid ? c.grid : 'transparent' } },
-    y: { ticks: { color: c.text }, grid: { color: c.grid }, beginAtZero: true },
-  };
-}
-
-// ===== Paint Charts =====
-
-function paintLiveChart(readings) {
-  destroyChart('live');
-  if (!readings.length) return;
-  const c = chartColors();
-  const labels = readings.map(r => r.timestamp ? r.timestamp.split(' ')[1] : '');
-  const data = readings.map(r => r.power_on ? (r.reachable ? r.power_w : null) : 0);
-  chartInstances['live'] = new Chart(document.getElementById('chartLive'), {
-    type: 'line',
-    data: { labels, datasets: [{ label: 'W', data, borderColor: c.avgBorder, backgroundColor: c.avg, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5 }] },
-    options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false },
-      scales: makeScales(false),
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
-    }
-  });
-}
-
-function paintHourlyChart(hourly) {
-  destroyChart('hourly');
-  if (!hourly.length) return;
-  const c = chartColors();
-  const labels = hourly.map(h => {
-    const parts = h.hour_key.split(' ');
-    const d = parts[0] ? parts[0].substring(5) : '';
-    return hourly.length > 48 ? d + ' ' + parts[1] + ':00' : parts[1] + ':00';
-  });
-  chartInstances['hourly'] = new Chart(document.getElementById('chartHourly'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Max', data: hourly.map(h => h.max_w), backgroundColor: c.max, borderRadius: 3 },
-        { label: 'Avg', data: hourly.map(h => h.avg_w), backgroundColor: c.avg, borderRadius: 3 },
-        { label: 'Min', data: hourly.map(h => h.min_w), backgroundColor: c.min, borderRadius: 3 },
-      ]
-    },
-    options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false },
-      scales: makeScales(),
-      plugins: { legend: { labels: { color: c.text, boxWidth: 12 } } }
-    }
-  });
-}
-
-function paintTempChart(hourly) {
-  destroyChart('temp');
-  if (!hourly.length) return;
-  const c = chartColors();
-  const labels = hourly.map(h => {
-    const parts = h.hour_key.split(' ');
-    return hourly.length > 48 ? parts[0].substring(5) + ' ' + parts[1] + ':00' : parts[1] + ':00';
-  });
-  chartInstances['temp'] = new Chart(document.getElementById('chartTemp'), {
-    type: 'line',
-    data: { labels, datasets: [{ label: '°C', data: hourly.map(h => h.avg_temp), borderColor: c.tempBorder, backgroundColor: c.temp, fill: false, tension: 0.3, pointRadius: hourly.length > 48 ? 0 : 2, borderWidth: 1.5 }] },
-    options: { responsive: true, maintainAspectRatio: true,
-      scales: makeScales(),
-      plugins: { legend: { display: false } }
-    }
-  });
-}
-
-function paintDailyChart(daily) {
-  destroyChart('daily');
-  if (!daily.length) return;
-  const c = chartColors();
-  const labels = daily.map(d => fmtDate(d.day));
-  chartInstances['daily'] = new Chart(document.getElementById('chartDaily'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'kWh', data: daily.map(d => d.kwh), backgroundColor: c.bar, borderColor: c.barBorder, borderWidth: 1, borderRadius: 4 },
-      ]
-    },
-    options: { responsive: true, maintainAspectRatio: true,
-      scales: { ...makeScales(), y: { ...makeScales().y, title: { display: true, text: 'kWh', color: c.text } } },
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { afterBody: (items) => {
-          const i = items[0].dataIndex;
-          const d = daily[i];
-          return [`峰值: ${fmt(d.max_power)}W`, `均值: ${fmt(d.avg_power)}W`, `温度: ${fmt(d.avg_temp)}°C`];
-        }}
-      }}
-    }
-  });
-}
-
-function paintMonthlyChart(monthly) {
-  destroyChart('monthly');
-  if (!monthly.length) return;
-  const c = chartColors();
-  chartInstances['monthly'] = new Chart(document.getElementById('chartMonthly'), {
-    type: 'bar',
-    data: {
-      labels: monthly.map(m => fmtMonth(m.month)),
-      datasets: [{ label: 'kWh', data: monthly.map(m => m.kwh), backgroundColor: c.bar, borderColor: c.barBorder, borderWidth: 1, borderRadius: 4 }]
-    },
-    options: { responsive: true, maintainAspectRatio: true,
-      scales: { ...makeScales(), y: { ...makeScales().y, title: { display: true, text: 'kWh', color: c.text } } },
-      plugins: { legend: { display: false } }
-    }
-  });
-}
-
-function paintMonthlyPowerChart(monthly) {
-  destroyChart('monthlyPower');
-  if (!monthly.length) return;
-  const c = chartColors();
-  chartInstances['monthlyPower'] = new Chart(document.getElementById('chartMonthlyPower'), {
-    type: 'bar',
-    data: {
-      labels: monthly.map(m => fmtMonth(m.month)),
-      datasets: [
-        { label: 'Max W', data: monthly.map(m => m.max_power), backgroundColor: c.max, borderRadius: 3 },
-        { label: 'Avg W', data: monthly.map(m => m.avg_power), backgroundColor: c.avg, borderRadius: 3 },
-      ]
-    },
-    options: { responsive: true, maintainAspectRatio: true,
-      scales: makeScales(),
-      plugins: { legend: { labels: { color: c.text, boxWidth: 12 } } }
-    }
-  });
-}
-
-function paintMonthlyTempChart(monthly) {
-  destroyChart('monthlyTemp');
-  if (!monthly.length) return;
-  const c = chartColors();
-  chartInstances['monthlyTemp'] = new Chart(document.getElementById('chartMonthlyTemp'), {
-    type: 'line',
-    data: {
-      labels: monthly.map(m => fmtMonth(m.month)),
-      datasets: [
-        { label: 'Avg °C', data: monthly.map(m => m.avg_temp), borderColor: c.tempBorder, fill: false, tension: 0.3 },
-        { label: 'Max °C', data: monthly.map(m => m.max_temp), borderColor: c.maxBorder, fill: false, tension: 0.3, borderDash: [4, 4] },
-      ]
-    },
-    options: { responsive: true, maintainAspectRatio: true,
-      scales: makeScales(),
-      plugins: { legend: { labels: { color: c.text, boxWidth: 12 } } }
-    }
-  });
-}
-
-function paintHeatmap(data) {
-  const container = document.getElementById('heatmapContainer');
-  if (!container) return;
-  if (!data.length) { container.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:20px">暂无数据</div>'; return; }
-
-  const maxW = Math.max(...data.map(d => d.max_w || 0), 1);
-  const hours = Array.from({length: 24}, (_, i) => i);
-  const days = [...new Set(data.map(d => d.day))].sort();
-
-  const colorFor = (w) => {
-    if (!w) return 'var(--bg-surface)';
-    const r = w / maxW;
-    if (r < 0.25) return 'var(--hm1)';
-    if (r < 0.5) return 'var(--hm2)';
-    if (r < 0.75) return 'var(--hm3)';
-    return 'var(--hm4)';
-  };
-
-  const map = {};
-  data.forEach(d => { map[`${d.day}_${d.hour}`] = d; });
-
-  let html = '<table class="heatmap-table"><thead><tr><th></th>';
-  hours.forEach(h => html += `<th>${h}</th>`);
-  html += '</tr></thead><tbody>';
-
-  days.forEach(day => {
-    html += `<tr><th style="font-size:.55rem;white-space:nowrap">${fmtDate(day)}</th>`;
-    hours.forEach(h => {
-      const d = map[`${day}_${h}`];
-      const w = d ? d.avg_w : null;
-      const bg = colorFor(w);
-      const fg = w ? (w / maxW >= 0.5 ? 'rgba(255,255,255,.9)' : 'rgba(0,0,0,.7)') : 'transparent';
-      html += `<td style="background:${bg};color:${fg}">${w ? Math.round(w) : ''}</td>`;
-    });
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  container.innerHTML = html;
-}
-
-// ===== Init =====
+let renderKey = null;
+let autoRefresh = true;
+const esc = (s) => String(s ?? '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (n, min=0, max=100) => Math.min(max, Math.max(min, Number(n) || 0));
+function getTheme(){return localStorage.getItem('pm_theme') || 'auto'}
+function resolvedTheme(val=getTheme()){return val === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : val}
+function applyTheme(val){localStorage.setItem('pm_theme',val);document.documentElement.setAttribute('data-theme',resolvedTheme(val));document.querySelectorAll('#themeSwitch button').forEach(b=>b.classList.toggle('active',b.dataset.val===val));refreshChartTheme()}
+function refreshChartTheme(){Object.values(chartInstances).forEach(c=>{if(!c?.options?.scales)return;const colors=chartColors();if(c.options.scales.x){c.options.scales.x.ticks.color=colors.text;c.options.scales.x.grid.color=colors.grid}if(c.options.scales.y){c.options.scales.y.ticks.color=colors.text;c.options.scales.y.grid.color=colors.grid}c.update('none')})}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(getTheme()==='auto')applyTheme('auto')});
+document.querySelectorAll('#themeSwitch button').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.val)));document.getElementById('refreshToggle').addEventListener('click',()=>{autoRefresh=!autoRefresh;const b=document.getElementById('refreshToggle');b.classList.toggle('paused',!autoRefresh);b.textContent=autoRefresh?'自动刷新':'已暂停'});applyTheme(getTheme());
+function fmt(n,d=1){return n!=null && Number.isFinite(Number(n)) ? Number(n).toFixed(d) : '--'}
+function fmtYuan(n){return n!=null && Number.isFinite(Number(n)) ? '¥'+Number(n).toFixed(2) : '--'}
+function fmtDate(d){return d ? d.substring(5) : '--'}
+function fmtMonth(m){return m ? m.substring(5) : '--'}
+function fmtFullTime(ts){return ts ? ts.replace('T',' ') : '--'}
+function updateTime(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false})}
+document.querySelectorAll('.range-btn').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentRange=btn.dataset.range;document.getElementById('customRange').classList.toggle('show',currentRange==='custom');if(currentDevice)refresh(currentDevice)}));
+function applyCustomRange(){if(currentDevice)refresh(currentDevice)}
+function getRangeParams(){const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');const todayStr=`${y}-${m}-${d}`;const addDays=(dt,n)=>{const r=new Date(dt);r.setDate(r.getDate()+n);return r};const f=(dt)=>`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;switch(currentRange){case'today':return{type:'day',date:todayStr,start:todayStr,end:todayStr,label:'今日'};case'7d':return{type:'range',days:7,start:f(addDays(today,-6)),end:todayStr,label:'近7天'};case'30d':return{type:'range',days:30,start:f(addDays(today,-29)),end:todayStr,label:'近30天'};case'90d':return{type:'range',days:90,start:f(addDays(today,-89)),end:todayStr,label:'近90天'};case'year':return{type:'year',start:`${y}-01-01`,end:todayStr,label:'今年'};case'custom':{const s=document.getElementById('startDate').value;const e=document.getElementById('endDate').value;if(!s||!e)return{type:'day',date:todayStr,start:todayStr,end:todayStr,label:'今日'};return{type:'range',days:Math.max(1,Math.round((new Date(e)-new Date(s))/86400000)+1),start:s,end:e,label:`${s} ~ ${e}`}}default:return{type:'day',date:todayStr,start:todayStr,end:todayStr,label:'今日'}}}
+async function init(){try{const res=await fetch(`${API}/api/devices`);const devices=await res.json();if(!devices.length){document.getElementById('mainContent').innerHTML='<div class="empty-state"><div class="icon">🔌</div><div>未配置设备</div></div>';return}renderDeviceTabs(devices);switchDevice(devices[0].device_id)}catch(e){console.error('Init failed:',e);document.getElementById('mainContent').innerHTML='<div class="empty-state"><div class="icon">⚠️</div><div>加载失败，请刷新重试</div></div>'}setInterval(()=>{if(autoRefresh&&currentDevice)refresh(currentDevice)},30000);updateTime();setInterval(updateTime,1000)}
+function renderDeviceTabs(devices){document.getElementById('deviceTabs').innerHTML=devices.map(d=>{const id=esc(d.device_id);return`<div class="device-tab" data-id="${id}" onclick="switchDevice('${id}')"><span class="live-dot" id="dot_${id}"></span><span>${esc(d.name||d.device_id)}</span></div>`}).join('')}
+async function switchDevice(deviceId){currentDevice=deviceId;document.querySelectorAll('.device-tab').forEach(t=>t.classList.toggle('active',t.dataset.id===deviceId));await refresh(deviceId)}
+async function refresh(deviceId){try{const rp=getRangeParams();const sid=encodeURIComponent(deviceId);const viewParam=rp.type==='day'?'today':(rp.type==='year'?'year':'range');const data=await fetch(`${API}/api/dashboard/${sid}?view=${viewParam}&start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json());const key=`${deviceId}|${rp.type}|${rp.start}|${rp.end}`;const shouldRender=key!==renderKey;const latest=data.latest||{};const config=data.config||{};document.querySelectorAll(`#dot_${CSS.escape(deviceId)}`).forEach(dot=>dot.className=latest.reachable?'live-dot':'live-dot offline');let html='';if(rp.type==='day'){const today=data.today_stats||{}, readings=data.readings||[], hourly=data.hourly||[], peak=data.peak||{}, cost=data.cost||{};const label=rp.date===new Date().toISOString().slice(0,10)?'今日':rp.date;html=`${buildHero(latest,today,cost,config,label)}${buildStatsCards(latest,today,latest.reachable,latest.power_on,label)}${buildDayInsights(latest,today,cost,peak,config)}<div class="section-grid"><div class="section-col"><div class="card"><div class="card-title"><span class="card-title-main">📊 ${label}实时功率</span><span class="badge">分钟级</span></div><div class="chart-wrap"><canvas id="chartLive" height="230"></canvas></div></div><div class="card"><div class="card-title"><span class="card-title-main">📈 小时功率分布</span><span class="badge">Min / Avg / Max</span></div><div class="chart-wrap"><canvas id="chartHourly" height="190"></canvas></div></div></div><div class="section-col">${buildPeakCard(peak,label)}<div class="card"><div class="card-title"><span class="card-title-main">🌡️ 温度趋势</span><span class="badge">Avg °C</span></div><div class="chart-wrap"><canvas id="chartTemp" height="150"></canvas></div></div>${buildCostCard(cost,config)}</div></div>`;if(shouldRender)setContent(html,key);paintLiveChart(readings);if(shouldRender)paintHourlyChart(hourly);paintTempChart(readings)}else if(rp.type==='year'){const monthly=data.monthly||[], cost=data.cost||{};html=`${buildHero(latest,rangeSummaryFromCost(cost),cost,config,rp.label)}${buildRangeStats(latest,cost,rp.start,rp.end)}${buildRangeInsights(cost,{},config,monthly)}<div class="section-grid"><div class="section-col"><div class="card"><div class="card-title"><span class="card-title-main">📅 月度用电趋势</span><span class="badge">kWh</span></div><div class="chart-wrap"><canvas id="chartMonthly" height="220"></canvas></div></div><div class="card"><div class="card-title"><span class="card-title-main">📈 月度功率</span><span class="badge">Max / Avg W</span></div><div class="chart-wrap"><canvas id="chartMonthlyPower" height="190"></canvas></div></div></div><div class="section-col">${buildCostCard(cost,config)}<div class="card"><div class="card-title"><span class="card-title-main">🌡️ 月均温度</span><span class="badge">Avg / Max °C</span></div><div class="chart-wrap"><canvas id="chartMonthlyTemp" height="170"></canvas></div></div></div></div>`;if(shouldRender){setContent(html,key);paintMonthlyChart(monthly);paintMonthlyPowerChart(monthly);paintMonthlyTempChart(monthly)}}else{const daily=data.daily||[], cost=data.cost||{}, standby=data.standby||{}, heatmap=data.heatmap||[];html=`${buildHero(latest,rangeSummaryFromCost(cost),cost,config,rp.label)}${buildRangeStats(latest,cost,rp.start,rp.end)}${buildRangeInsights(cost,standby,config,daily)}<div class="section-grid"><div class="section-col"><div class="card"><div class="card-title"><span class="card-title-main">📅 每日用电</span><span class="badge">${fmtDate(rp.start)} ~ ${fmtDate(rp.end)}</span></div><div class="chart-wrap"><canvas id="chartDaily" height="220"></canvas></div></div><div class="card"><div class="card-title"><span class="card-title-main">🌡️ 功率热力图</span><span class="badge">小时均值 W</span></div><div class="heatmap-container" id="heatmapContainer"></div><div class="heatmap-legend"><span>低</span><i style="background:var(--hm1)"></i><i style="background:var(--hm2)"></i><i style="background:var(--hm3)"></i><i style="background:var(--hm4)"></i><span>高</span></div></div></div><div class="section-col">${buildCostCard(cost,config)}${buildStandbyCard(standby)}</div></div>`;if(shouldRender){setContent(html,key);paintDailyChart(daily);paintHeatmap(heatmap)}}}catch(e){console.error('Refresh failed:',e)}}
+function setContent(html,key){Object.keys(chartInstances).forEach(destroyChart);document.getElementById('mainContent').innerHTML=html;renderKey=key}
+function rangeSummaryFromCost(cost){return{avg_power:null,max_power:null,kwh_estimate:cost.total_kwh,uptime_pct:null,max_temp:null}}
+function statusText(d){if(!d.reachable)return['离线','error'];if(!d.power_on)return['已关机','warn'];return['运行中','ok']}
+function buildHero(d,stats,cost,config,label){const [text,level]=statusText(d);const power=d.reachable?(d.power_on?fmt(d.power_w):'OFF'):'--';const unit=d.reachable&&d.power_on?'W':'';const ts=fmtFullTime(d.timestamp);return`<div class="hero"><div class="hero-main"><div class="eyebrow"><span class="live-dot ${d.reachable?'':'offline'}"></span>${esc(label)} · 实时负载</div><div class="hero-value"><span class="num">${power}</span><span class="unit">${unit}</span></div><div class="hero-sub">${text} · 最近采样 ${ts}</div><div class="hero-metrics"><div class="hero-metric"><b>${fmt(stats.avg_power)} W</b><span>区间均值</span></div><div class="hero-metric"><b>${fmt(stats.max_power)} W</b><span>区间峰值</span></div><div class="hero-metric"><b>${fmtYuan(cost.total_cost)}</b><span>区间电费</span></div></div></div><div class="status-panel"><div class="card-title"><span>设备健康</span><span class="health-chip ${level==='ok'?'':level}">${text}</span></div><div class="status-row"><span>采集时间</span><b>${ts}</b></div><div class="status-row"><span>开关状态</span><b>${d.power_on?'ON':'OFF'}</b></div><div class="status-row"><span>插头温度</span><b>${fmt(d.temperature)} °C</b></div><div class="status-row"><span>采集间隔</span><b>${config.collect_interval||'--'} s</b></div><div class="status-row"><span>计费模式</span><b>${config.is_tou?'峰谷分时':'统一电价'}</b></div></div></div>`}
+function buildStatsCards(d,today,online,on,label){return`<div class="stats-grid"><div class="stat-card accent"><div class="stat-label">实时功率</div><div><div class="stat-value">${online?(on?fmt(d.power_w):'OFF'):'--'}${online&&on?'<span class="stat-unit">W</span>':''}</div><div class="stat-foot">${online?(on?'负载运行中':'设备通电但关闭'):'设备不可达'}</div></div></div><div class="stat-card"><div class="stat-label">${label}均值</div><div><div class="stat-value">${fmt(today.avg_power)}<span class="stat-unit">W</span></div><div class="stat-foot">平均负载水平</div></div></div><div class="stat-card"><div class="stat-label">${label}峰值</div><div><div class="stat-value">${fmt(today.max_power)}<span class="stat-unit">W</span></div><div class="stat-foot">最高瞬时功率</div></div></div><div class="stat-card warning"><div class="stat-label">${label}用电</div><div><div class="stat-value">${fmt(today.kwh_estimate,3)}<span class="stat-unit">kWh</span></div><div class="stat-foot">按采集间隔估算</div></div></div><div class="stat-card"><div class="stat-label">最高温度</div><div><div class="stat-value">${fmt(today.max_temp)}<span class="stat-unit">°C</span></div><div class="stat-foot">插头温度上限</div></div></div><div class="stat-card success"><div class="stat-label">在线率</div><div><div class="stat-value">${fmt(today.uptime_pct,0)}<span class="stat-unit">%</span></div><div class="stat-foot">可达采样占比</div></div></div></div>`}
+function buildRangeStats(d,cost,start,end){const days=cost.days_covered||1;return`<div class="stats-grid"><div class="stat-card accent"><div class="stat-label">实时功率</div><div><div class="stat-value">${d.reachable?(d.power_on?fmt(d.power_w):'OFF'):'--'}${d.reachable&&d.power_on?'<span class="stat-unit">W</span>':''}</div><div class="stat-foot">当前设备状态</div></div></div><div class="stat-card warning"><div class="stat-label">累计用电</div><div><div class="stat-value">${fmt(cost.total_kwh,2)}<span class="stat-unit">kWh</span></div><div class="stat-foot">覆盖 ${days} 天</div></div></div><div class="stat-card"><div class="stat-label">累计电费</div><div><div class="stat-value">${fmtYuan(cost.total_cost)}</div><div class="stat-foot">区间估算</div></div></div><div class="stat-card"><div class="stat-label">日均电费</div><div><div class="stat-value">${fmtYuan(cost.daily_avg_cost)}</div><div class="stat-foot">按有数据天数</div></div></div><div class="stat-card"><div class="stat-label">日均用电</div><div><div class="stat-value">${fmt(cost.total_kwh/Math.max(days,1),3)}<span class="stat-unit">kWh</span></div><div class="stat-foot">≈ ${fmt(cost.total_kwh/Math.max(days,1)*1000,0)} Wh</div></div></div><div class="stat-card"><div class="stat-label">统计范围</div><div><div class="stat-value" style="font-size:1rem;letter-spacing:0">${fmtDate(start)} ~ ${fmtDate(end)}</div><div class="stat-foot">${days} 个有效日期</div></div></div></div>`}
+function buildDayInsights(d,today,cost,peak,config){const load=peak?.peak_w&&today?.avg_power?clamp(today.avg_power/peak.peak_w*100):0;return`<div class="insight-grid"><div class="insight-card"><div class="insight-title"><span>负载系数</span><span>Avg/Peak</span></div><div class="insight-value">${fmt(load,0)}%</div><div class="meter"><i style="width:${load}%"></i></div><div class="insight-caption">均值越接近峰值，负载越稳定。</div></div><div class="insight-card"><div class="insight-title"><span>峰值倍率</span><span>异常观察</span></div><div class="insight-value">${fmt(peak.multiplier,1)}x</div><div class="insight-caption">峰值 ${fmt(peak.peak_w)}W · ${peak.timestamp?peak.timestamp.split(' ')[1]:'--'}</div></div><div class="insight-card"><div class="insight-title"><span>日电费</span><span>${config.is_tou?'峰谷':'统一'}</span></div><div class="insight-value">${fmtYuan(cost.total_cost)}</div><div class="insight-caption">用电 ${fmt(cost.total_kwh,3)} kWh。</div></div><div class="insight-card"><div class="insight-title"><span>温度裕度</span><span>热观察</span></div><div class="insight-value">${fmt(today.max_temp)}°C</div><div class="insight-caption">当前 ${fmt(d.temperature)}°C，持续升高需关注。</div></div></div>`}
+function buildRangeInsights(cost,standby,config,series){const days=cost.days_covered||1;const standbyPct=standby.standby_pct||0;const avgKwh=cost.total_kwh/Math.max(days,1);const maxKwh=Array.isArray(series)&&series.length?Math.max(...series.map(x=>x.kwh||0)):0;return`<div class="insight-grid"><div class="insight-card"><div class="insight-title"><span>日均能耗</span><span>Baseline</span></div><div class="insight-value">${fmt(avgKwh,3)}</div><div class="insight-caption">kWh/日 · 峰日 ${fmt(maxKwh,3)} kWh。</div></div><div class="insight-card"><div class="insight-title"><span>待机占比</span><span>&lt;${config.standby_threshold||5}W</span></div><div class="insight-value">${fmt(standbyPct,0)}%</div><div class="meter"><i style="width:${clamp(standbyPct)}%"></i></div><div class="insight-caption">识别低负载时间段，辅助节能。</div></div><div class="insight-card"><div class="insight-title"><span>峰谷拆分</span><span>${config.is_tou?'TOU':'Flat'}</span></div><div class="insight-value">${fmt(cost.peak_kwh,2)} / ${fmt(cost.valley_kwh,2)}</div><div class="insight-caption">峰段 / 谷段 kWh。</div></div><div class="insight-card"><div class="insight-title"><span>费用预测</span><span>Run-rate</span></div><div class="insight-value">${fmtYuan((cost.daily_avg_cost||0)*30)}</div><div class="insight-caption">按当前日均电费折算 30 天。</div></div></div>`}
+function buildPeakCard(peak,label){if(!(peak&&peak.peak_w))return`<div class="card"><div class="card-title"><span class="card-title-main">⚡ ${label}峰值</span><span class="badge">暂无</span></div><div class="insight-caption">当前日期还没有可用于峰值分析的功率采样。</div></div>`;return`<div class="card" style="background:var(--md-sys-color-warning-container);color:var(--md-sys-color-warning);border-color:transparent"><div class="card-title"><span class="card-title-main">⚡ ${label}峰值</span><span class="badge" style="background:color-mix(in srgb,currentColor 16%,transparent);color:currentColor">${fmt(peak.multiplier)}x</span></div><div class="insight-value" style="color:currentColor">${fmt(peak.peak_w)} W</div><div class="insight-caption" style="color:currentColor">${peak.timestamp?peak.timestamp.split(' ')[1]:'--'} · 均值 ${fmt(peak.avg_w)}W · 温度 ${fmt(peak.temperature)}°C</div></div>`}
+function buildCostCard(cost,config){return`<div class="card"><div class="card-title"><span class="card-title-main">💰 电费估算</span><span class="badge">${cost.is_tou?`${config.peak_rate}峰 / ${config.valley_rate}谷`:`${config.electricity_rate}元/度`}</span></div><div class="cost-big"><div class="cost-label">累计电费（${cost.days_covered||0} 天）</div><div class="cost-value">${fmtYuan(cost.total_cost)}</div></div><div class="cost-grid">${cost.is_tou?`<div class="cost-item"><div class="cost-label">峰段用电</div><div class="cost-value">${fmt(cost.peak_kwh,3)}<span class="stat-unit">kWh</span></div></div><div class="cost-item"><div class="cost-label">谷段用电</div><div class="cost-value">${fmt(cost.valley_kwh,3)}<span class="stat-unit">kWh</span></div></div>`:`<div class="cost-item"><div class="cost-label">累计用电</div><div class="cost-value">${fmt(cost.total_kwh,3)}<span class="stat-unit">kWh</span></div></div><div class="cost-item"><div class="cost-label">单价</div><div class="cost-value">${config.electricity_rate}<span class="stat-unit">元/度</span></div></div>`}<div class="cost-item"><div class="cost-label">日均电费</div><div class="cost-value">${fmtYuan(cost.daily_avg_cost)}</div></div><div class="cost-item"><div class="cost-label">30天折算</div><div class="cost-value">${fmtYuan((cost.daily_avg_cost||0)*30)}</div></div></div></div>`}
+function buildStandbyCard(standby){return`<div class="card"><div class="card-title"><span class="card-title-main">💤 待机分析</span><span class="badge">&lt;${standby.threshold_w||5}W</span></div><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="cost-label">待机占比</span><span class="insight-value" style="font-size:1.8rem;color:var(--md-sys-color-warning)">${fmt(standby.standby_pct,0)}%</span></div><div class="standby-bar"><div class="standby-fill" style="width:${clamp(standby.standby_pct)}%"></div></div><div class="insight-caption">待机 ${fmt(standby.avg_standby_w)}W · ${fmt(standby.standby_kwh,3)}kWh · ${fmt(standby.standby_points,0)} 个采样点</div></div>`}
+function chartColors(){const dark=document.documentElement.getAttribute('data-theme')==='dark';return{grid:dark?'#49454f':'#e7e0ec',text:dark?'#cac4d0':'#625b71',avg:dark?'rgba(208,188,255,.46)':'rgba(103,80,164,.32)',avgBorder:dark?'#d0bcff':'#6750a4',max:dark?'rgba(255,180,171,.62)':'rgba(186,26,26,.42)',maxBorder:dark?'#ffb4ab':'#ba1a1a',min:dark?'rgba(141,211,245,.42)':'rgba(0,102,138,.30)',temp:dark?'rgba(255,185,92,.75)':'rgba(138,81,0,.68)',tempBorder:dark?'#ffb95c':'#8a5100',bar:dark?'rgba(208,188,255,.52)':'rgba(103,80,164,.42)',barBorder:dark?'#d0bcff':'#6750a4',surface:dark?'rgba(33,31,38,.9)':'rgba(255,251,254,.94)'}}
+function destroyChart(id){if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id]}}
+function makeScales(showGrid=true){const c=chartColors();return{x:{ticks:{color:c.text,maxRotation:45,font:{size:10,weight:'600'}},grid:{color:showGrid?c.grid:'transparent'}},y:{ticks:{color:c.text,font:{weight:'600'}},grid:{color:c.grid},beginAtZero:true}}}
+function basePlugins(){const c=chartColors();return{legend:{labels:{color:c.text,boxWidth:12,usePointStyle:true}},tooltip:{mode:'index',intersect:false,backgroundColor:c.surface,titleColor:c.text,bodyColor:c.text,borderColor:c.grid,borderWidth:1,padding:10}}}
+function paintLiveChart(readings){if(!readings.length)return;const c=chartColors();const labels=readings.map(r=>r.timestamp?r.timestamp.split(' ')[1]:'');const data=readings.map(r=>r.power_on?(r.reachable?r.power_w:null):0);if(chartInstances.live){chartInstances.live.data.labels=labels;chartInstances.live.data.datasets[0].data=data;chartInstances.live.update('none');return}chartInstances.live=new Chart(document.getElementById('chartLive'),{type:'line',data:{labels,datasets:[{label:'功率 W',data,borderColor:c.avgBorder,backgroundColor:c.avg,fill:true,tension:.35,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,animation:false,interaction:{mode:'index',intersect:false},scales:makeScales(false),plugins:{...basePlugins(),legend:{display:false}}}})}
+function paintHourlyChart(hourly){destroyChart('hourly');if(!hourly.length)return;const c=chartColors();const labels=hourly.map(h=>{const p=h.hour_key.split(' ');return hourly.length>48?p[0].substring(5)+' '+p[1]+':00':p[1]+':00'});chartInstances.hourly=new Chart(document.getElementById('chartHourly'),{type:'bar',data:{labels,datasets:[{label:'Max',data:hourly.map(h=>h.max_w),backgroundColor:c.max,borderRadius:8},{label:'Avg',data:hourly.map(h=>h.avg_w),backgroundColor:c.avg,borderRadius:8},{label:'Min',data:hourly.map(h=>h.min_w),backgroundColor:c.min,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:true,interaction:{mode:'index',intersect:false},scales:makeScales(),plugins:basePlugins()}})}
+function paintTempChart(points){if(!points.length)return;const c=chartColors();const labels=points.map(p=>p.timestamp?p.timestamp.split(' ')[1]:(p.hour_key?((p.hour_key.split(' ').length>1?p.hour_key.split(' ')[1]:p.hour_key)+':00'):''));const data=points.map(p=>p.temperature??p.avg_temp).filter(v=>v!=null);const keptLabels=points.filter(p=>(p.temperature??p.avg_temp)!=null).map(p=>p.timestamp?p.timestamp.split(' ')[1]:(p.hour_key?((p.hour_key.split(' ').length>1?p.hour_key.split(' ')[1]:p.hour_key)+':00'):''));if(!data.length)return;if(chartInstances.temp){chartInstances.temp.data.labels=keptLabels;chartInstances.temp.data.datasets[0].data=data;chartInstances.temp.update('none');return}chartInstances.temp=new Chart(document.getElementById('chartTemp'),{type:'line',data:{labels:keptLabels,datasets:[{label:'温度 °C',data,borderColor:c.tempBorder,backgroundColor:c.temp,fill:false,tension:.35,pointRadius:data.length>80?0:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,animation:false,scales:makeScales(),plugins:{...basePlugins(),legend:{display:false}}}})}
+function paintDailyChart(daily){destroyChart('daily');if(!daily.length)return;const c=chartColors();chartInstances.daily=new Chart(document.getElementById('chartDaily'),{type:'bar',data:{labels:daily.map(d=>fmtDate(d.day)),datasets:[{label:'kWh',data:daily.map(d=>d.kwh),backgroundColor:c.bar,borderColor:c.barBorder,borderWidth:1,borderRadius:10}]},options:{responsive:true,maintainAspectRatio:true,scales:{...makeScales(),y:{...makeScales().y,title:{display:true,text:'kWh',color:c.text}}},plugins:{...basePlugins(),legend:{display:false},tooltip:{...basePlugins().tooltip,callbacks:{afterBody:(items)=>{const d=daily[items[0].dataIndex];return[`峰值: ${fmt(d.max_power)}W`,`均值: ${fmt(d.avg_power)}W`,`温度: ${fmt(d.avg_temp)}°C`]}}}}}})}
+function paintMonthlyChart(monthly){destroyChart('monthly');if(!monthly.length)return;const c=chartColors();chartInstances.monthly=new Chart(document.getElementById('chartMonthly'),{type:'bar',data:{labels:monthly.map(m=>fmtMonth(m.month)),datasets:[{label:'kWh',data:monthly.map(m=>m.kwh),backgroundColor:c.bar,borderColor:c.barBorder,borderWidth:1,borderRadius:10}]},options:{responsive:true,maintainAspectRatio:true,scales:{...makeScales(),y:{...makeScales().y,title:{display:true,text:'kWh',color:c.text}}},plugins:{...basePlugins(),legend:{display:false}}}})}
+function paintMonthlyPowerChart(monthly){destroyChart('monthlyPower');if(!monthly.length)return;const c=chartColors();chartInstances.monthlyPower=new Chart(document.getElementById('chartMonthlyPower'),{type:'bar',data:{labels:monthly.map(m=>fmtMonth(m.month)),datasets:[{label:'Max W',data:monthly.map(m=>m.max_power),backgroundColor:c.max,borderRadius:8},{label:'Avg W',data:monthly.map(m=>m.avg_power),backgroundColor:c.avg,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:true,scales:makeScales(),plugins:basePlugins()}})}
+function paintMonthlyTempChart(monthly){destroyChart('monthlyTemp');if(!monthly.length)return;const c=chartColors();chartInstances.monthlyTemp=new Chart(document.getElementById('chartMonthlyTemp'),{type:'line',data:{labels:monthly.map(m=>fmtMonth(m.month)),datasets:[{label:'Avg °C',data:monthly.map(m=>m.avg_temp),borderColor:c.tempBorder,fill:false,tension:.35},{label:'Max °C',data:monthly.map(m=>m.max_temp),borderColor:c.maxBorder,fill:false,tension:.35,borderDash:[5,5]}]},options:{responsive:true,maintainAspectRatio:true,scales:makeScales(),plugins:basePlugins()}})}
+function paintHeatmap(data){const container=document.getElementById('heatmapContainer');if(!container)return;if(!data.length){container.innerHTML='<div style="text-align:center;color:var(--md-sys-color-on-surface-variant);padding:28px">暂无数据</div>';return}const maxW=Math.max(...data.map(d=>d.max_w||0),1);const hours=Array.from({length:24},(_,i)=>i);const days=[...new Set(data.map(d=>d.day))].sort();const colorFor=(w)=>{if(!w)return'var(--md-sys-color-surface-container-high)';const r=w/maxW;if(r<.25)return'var(--hm1)';if(r<.5)return'var(--hm2)';if(r<.75)return'var(--hm3)';return'var(--hm4)'};const map={};data.forEach(d=>{map[`${d.day}_${d.hour}`]=d});let html='<table class="heatmap-table"><thead><tr><th></th>';hours.forEach(h=>html+=`<th>${h}</th>`);html+='</tr></thead><tbody>';days.forEach(day=>{html+=`<tr><th style="white-space:nowrap">${fmtDate(day)}</th>`;hours.forEach(h=>{const d=map[`${day}_${h}`];const w=d?d.avg_w:null;const fg=w&&w/maxW>=.55?'rgba(255,255,255,.92)':'rgba(0,0,0,.72)';html+=`<td title="${day} ${h}:00 · ${fmt(w)}W" style="background:${colorFor(w)};color:${w?fg:'transparent'}">${w?Math.round(w):''}</td>`});html+='</tr>'});html+='</tbody></table>';container.innerHTML=html}
 init();
 </script>
 </body>
