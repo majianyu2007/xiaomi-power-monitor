@@ -28,7 +28,7 @@
       
       --text-primary: #1e293b; /* Slate 800 */
       --text-secondary: #64748b; /* Slate 500 */
-      --border-color: rgba(255, 255, 255, 0.5);
+      --border-color: rgba(255, 255, 255, 0.45);
       
       --primary-color: #0284c7;
       --success-color: #10b981;
@@ -272,11 +272,11 @@
     
     .device-tabs {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
       border-radius: 999px;
-      padding: 4px;
+      padding: 6px;
       box-shadow: var(--glass-shadow);
       overflow-x: auto;
       scrollbar-width: none;
@@ -1059,7 +1059,7 @@
       border: 1px solid var(--border-color);
     }
     
-    /* 空白状态 */
+    /* 空比状态 */
     .empty-state {
       text-align: center;
       padding: 70px 20px;
@@ -1418,6 +1418,8 @@
                 </div>
               </div>
               ${buildCostCard(cost, config)}
+              ${buildPeakHourCard(hourly)}
+              ${buildCarbonCard(cost)}
             </div>
           </div>
         `;
@@ -1465,6 +1467,7 @@
                   <canvas id="chartMonthlyTemp"></canvas>
                 </div>
               </div>
+              ${buildCarbonCard(cost)}
             </div>
           </div>
         `;
@@ -1512,6 +1515,8 @@
             <div class="section-col">
               ${buildCostCard(cost, config)}
               ${buildStandbyCard(standby)}
+              ${buildSavingROICard(standby, config)}
+              ${buildCarbonCard(cost)}
             </div>
           </div>
         `;
@@ -1607,24 +1612,24 @@
           </div>
           <div class="status-list">
             <div class="status-item">
-              <span class="lbl">网络可达性</span>
-              <span class="val font-mono">${d.reachable ? 'ONLINE (在线)' : 'OFFLINE (离线)'}</span>
+              <span class="lbl">数据采集时间</span>
+              <span class="val font-mono">${ts}</span>
             </div>
             <div class="status-item">
-              <span class="lbl">继电器物理开关</span>
+              <span class="lbl">继电器开关</span>
               <span class="val font-mono status-switch ${d.power_on ? 'on' : 'off'}">${d.power_on ? 'ON (通电中)' : 'OFF (断电中)'}</span>
             </div>
             <div class="status-item">
-              <span class="lbl">当前运行温度</span>
+              <span class="lbl">插头工作温度</span>
               <span class="val font-mono ${d.temperature > 50 ? 'temp-high' : ''}">${fmt(d.temperature)} °C</span>
             </div>
             <div class="status-item">
-              <span class="lbl">样本上报频率</span>
-              <span class="val font-mono">${config.collect_interval || '--'} 秒/包</span>
+              <span class="lbl">安全运行状态</span>
+              <span class="val font-mono ${d.temperature > 50 ? 'temp-high' : ''}">${d.temperature > 50 ? '需关注温度' : '良好'}</span>
             </div>
             <div class="status-item">
-              <span class="lbl">计价模式类别</span>
-              <span class="val font-mono">${config.is_tou ? '分时电费' : '统一标准价'}</span>
+              <span class="lbl">计费模式</span>
+              <span class="val font-mono">${config.is_tou ? '分时电费' : '统一电价'}</span>
             </div>
           </div>
         </div>
@@ -1674,7 +1679,7 @@
           <div class="stat-label">设备在线率</div>
           <div>
             <div class="stat-value font-title font-mono">${fmt(today.uptime_pct, 0)}<span class="stat-unit">%</span></div>
-            <div class="stat-foot">通信健康度百分比</div>
+            <div class="stat-foot">有效采样时间比</div>
           </div>
         </div>
       </div>
@@ -1895,9 +1900,150 @@
           <div class="standby-fill" style="width:${clamp(standby.standby_pct)}%"></div>
         </div>
         <div class="insight-caption">
-          待机阶段均值: ${fmt(standby.avg_standby_w)}W<br>
-          待机耗损电量: ${fmt(standby.standby_kwh, 3)} kWh<br>
+          待机平均功率: ${fmt(standby.avg_standby_w)}W<br>
+          待机损耗电量: ${fmt(standby.standby_kwh, 3)} kWh<br>
           符合采样计点: ${fmt(standby.standby_points, 0)} 点样本
+        </div>
+      </div>
+    `;
+  }
+
+  // 🍃 新增：低碳环保卡片
+  function buildCarbonCard(cost) {
+    const kwh = cost.total_kwh || 0;
+    const co2 = kwh * 0.570; // 1 kWh ≈ 0.57 kg CO2
+    const coal = kwh * 0.220; // 1 kWh ≈ 0.22 kg 标煤
+    const tree = co2 / 18.3;  // 1棵树年吸收约18.3kg CO2
+    
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">🍃 绿色低碳与环保指标</span>
+          <span class="badge">低碳节能</span>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <span class="cost-label">累计产生的二氧化碳排放量</span>
+          <div class="cost-value font-title font-mono" style="color:var(--success-color); font-size: 1.95rem;">
+            ${fmt(co2, 2)} <span style="font-size: 0.9rem; font-weight: 700;">kg</span>
+          </div>
+        </div>
+        <div class="status-list" style="gap: 8px;">
+          <div class="status-item" style="padding-bottom: 6px;">
+            <span class="lbl">等效标准煤消耗</span>
+            <span class="val font-mono">${fmt(coal, 2)} kg</span>
+          </div>
+          <div class="status-item" style="padding-bottom: 0px; border-bottom: none;">
+            <span class="lbl">等效植树固碳量</span>
+            <span class="val font-mono">🌲 约 ${fmt(tree, 1)} 棵树/年</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ⏰ 新增：日用电负荷高峰时段分析
+  function buildPeakHourCard(hourly) {
+    if (!hourly || !hourly.length) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">⏰ 负荷高峰时段</span>
+            <span class="badge">无样本</span>
+          </div>
+          <div class="insight-caption">暂无今日负荷采样，无法分析高峰期。</div>
+        </div>
+      `;
+    }
+    
+    let maxHour = -1;
+    let maxVal = -1;
+    hourly.forEach(h => {
+      if (h.avg_w > maxVal) {
+        maxVal = h.avg_w;
+        const parts = h.hour_key.split(' ');
+        const hourStr = parts.length > 1 ? parts[1] : h.hour_key;
+        maxHour = parseInt(hourStr);
+      }
+    });
+    
+    if (maxHour === -1 || maxVal < 1) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">⏰ 负荷高峰时段</span>
+            <span class="badge">待机中</span>
+          </div>
+          <div class="insight-caption">设备今日主要处于关机或超低负载运行状态。</div>
+        </div>
+      `;
+    }
+    
+    const nextHour = (maxHour + 1) % 24;
+    const timeRange = `${String(maxHour).padStart(2, '0')}:00 ~ ${String(nextHour).padStart(2, '0')}:00`;
+    
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">⏰ 负荷高峰时段</span>
+          <span class="badge">用能特征</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <span class="cost-label">今日用电平均负荷最大时间段</span>
+          <div class="cost-value font-title font-mono" style="font-size: 1.65rem; color:var(--primary-color);">
+            ${timeRange}
+          </div>
+        </div>
+        <div class="insight-caption">
+          此高峰段内设备平均运行功率达 <b>${fmt(maxVal, 1)} W</b>，建议在此高峰时段合理规划大功率电器运转。
+        </div>
+      </div>
+    `;
+  }
+
+  // 💡 新增：待机节电ROI计算卡片
+  function buildSavingROICard(standby, config) {
+    if (!standby || !standby.standby_kwh || standby.standby_kwh < 0.001) {
+      return `
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-main">💡 智能待机节电 ROI</span>
+            <span class="badge">电耗极低</span>
+          </div>
+          <div class="insight-caption">该插座在统计周期内未发生明显的待机电量损耗。</div>
+        </div>
+      `;
+    }
+    
+    const rate = config.is_tou ? config.valley_rate : config.electricity_rate;
+    const dailyKwh = standby.standby_kwh;
+    const dailyCost = dailyKwh * rate;
+    const annualCost = dailyCost * 365;
+    const annualKwh = dailyKwh * 365;
+    
+    return `
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-main">💡 智能待机节电 ROI</span>
+          <span class="badge">节电投资</span>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <span class="cost-label">若通过自动定时任务切断待机电耗</span>
+          <div class="cost-value font-title font-mono" style="color:var(--success-color); font-size: 1.95rem;">
+            年均省 ${fmtYuan(annualCost)}
+          </div>
+        </div>
+        <div class="status-list" style="gap: 8px;">
+          <div class="status-item" style="padding-bottom: 6px;">
+            <span class="lbl">预计每年节省电量</span>
+            <span class="val font-mono">${fmt(annualKwh, 1)} kWh</span>
+          </div>
+          <div class="status-item" style="padding-bottom: 0px; border-bottom: none;">
+            <span class="lbl">每日待机漏电费用</span>
+            <span class="val font-mono">${fmtYuan(dailyCost)} / 天</span>
+          </div>
+        </div>
+        <div class="insight-caption" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+          💡 <b>优化配置建议</b>: 待机时间占比已达 <b>${fmt(standby.standby_pct, 0)}%</b>，可在插座设置中配置“夜间自动断电”或“定时开关”以完全消除漏电。
         </div>
       </div>
     `;
@@ -2205,7 +2351,7 @@
         labels: monthly.map(m => fmtMonth(m.month)),
         datasets: [
           { label: '最高冲击 Max W', data: monthly.map(m => m.max_power), backgroundColor: c.max, borderRadius: 8 },
-          { label: '均值功率 Avg W', data: monthly.map(m => m.avg_power), backgroundColor: c.avg, borderRadius: 8 }
+          { label: '平均功率 Avg W', data: monthly.map(m => m.avg_power), backgroundColor: c.avg, borderRadius: 8 }
         ]
       },
       options: {
