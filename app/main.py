@@ -22,7 +22,7 @@ PLUG_IP = os.environ.get("PLUG_IP", "")
 PLUG_TOKEN = os.environ.get("PLUG_TOKEN", "")
 COLLECT_INTERVAL = max(int(os.environ.get("COLLECT_INTERVAL", "60")), 5)  # 最低5秒, 防止过快
 DB_PATH = os.environ.get("DB_PATH", "/data/power_data.db")
-RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "90"))  # 数据保留天数
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "0"))  # 数据保留天数, 0=永不清理
 PORT = int(os.environ.get("PORT", "8080"))
 
 # 多设备配置: DEVICES_JSON = [{"id":"plug1",...}, ...]
@@ -237,6 +237,69 @@ def api_config():
         "devices": [{"id": d["id"], "name": d.get("name", d["id"])}
                      for d in devices_config],
     }
+
+
+@app.get("/api/dashboard/{device_id}")
+def api_dashboard(device_id: str, view: str = "today", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """聚合接口：一次请求返回当前视图所需的所有数据，减少前端并发请求数"""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _CST = _tz(_td(hours=8))
+    today_str = _dt.now(_CST).strftime("%Y-%m-%d")
+    if not end_date:
+        end_date = today_str
+
+    result = {"view": view, "device_id": device_id}
+
+    # 实时状态 + 配置（所有视图都需要）
+    result["latest"] = db.get_latest(device_id) or {"device_id": device_id, "reachable": 0}
+    result["config"] = {
+        "electricity_rate": ELECTRICITY_RATE,
+        "peak_rate": PEAK_RATE or None,
+        "valley_rate": VALLEY_RATE or None,
+        "is_tou": PEAK_RATE is not None and VALLEY_RATE is not None,
+        "standby_threshold": STANDBY_THRESHOLD,
+        "collect_interval": COLLECT_INTERVAL,
+        "peak_hours_start": PEAK_HOURS_START,
+        "peak_hours_end": PEAK_HOURS_END,
+    }
+
+    if view == "day" or view == "today":
+        date = start_date or today_str
+        s, e = date, date
+        result["today_stats"] = db.get_today_stats(device_id, date=date)
+        result["today_stats"]["device_id"] = device_id
+        result["today_stats"]["uptime_pct"] = db.get_uptime_today(device_id, date=date)
+        result["readings"] = db.get_today_readings(device_id, date=date)
+        result["hourly"] = db.get_hourly_stats(device_id, start_date=s, end_date=e)
+        result["peak"] = db.get_peak_annotation(device_id, date=date) or {}
+        result["cost"] = _calc_cost(device_id, s, e)
+
+    elif view == "year":
+        s = start_date or f"{_dt.now(_CST).year}-01-01"
+        result["monthly"] = db.get_monthly_stats(device_id, start_date=s, end_date=end_date)
+        result["cost"] = _calc_cost(device_id, s, end_date)
+
+    else:  # range view: 7d, 30d, 90d, custom
+        s = start_date or today_str
+        e = end_date or today_str
+        result["daily"] = db.get_daily_stats(device_id, start_date=s, end_date=e)
+        result["cost"] = _calc_cost(device_id, s, e)
+        result["standby"] = db.get_standby_stats(device_id, threshold_w=STANDBY_THRESHOLD, start_date=s, end_date=e)
+        result["heatmap"] = db.get_heatmap_data(device_id, start_date=s, end_date=e)
+
+    return result
+
+
+def _calc_cost(device_id: str, start_date: str, end_date: str) -> dict:
+    peak = PEAK_RATE if PEAK_RATE is not None else ELECTRICITY_RATE
+    valley = VALLEY_RATE if VALLEY_RATE is not None else ELECTRICITY_RATE
+    is_tou = PEAK_RATE is not None and VALLEY_RATE is not None
+    result = db.get_cost_estimate(device_id, peak_rate=peak, valley_rate=valley,
+                                    peak_start=PEAK_HOURS_START, peak_end=PEAK_HOURS_END,
+                                    start_date=start_date, end_date=end_date)
+    result["flat_rate"] = ELECTRICITY_RATE
+    result["is_tou"] = is_tou
+    return result
 
 
 # ============ 前端 ============

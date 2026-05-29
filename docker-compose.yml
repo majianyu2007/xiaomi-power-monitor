@@ -7,18 +7,14 @@ services:
       - "${PORT:-8080}:8080"
     volumes:
       - power-data:/data
+    env_file:
+      - .env
     environment:
-      # 单设备模式（简单）
-      - PLUG_IP=${PLUG_IP:-}
-      - PLUG_TOKEN=${PLUG_TOKEN}
       - COLLECT_INTERVAL=${COLLECT_INTERVAL:-60}
       - DB_PATH=/data/power_data.db
       - RETENTION_DAYS=${RETENTION_DAYS:-0}
-      - TZ=Asia/Shanghai
-      # 📌 多设备模式：取消注释 DEVICES_JSON 并注释掉 PLUG_IP/PLUG_TOKEN
-      # 格式: [{"id":"plug1","name":"书桌插座","model":"cuco.plug.v3","ip":"192.168.10.203","token":"xxx"}, ...]
-      # - DEVICES_JSON=[{"id":"plug1","name":"书桌插座","model":"cuco.plug.v3","ip":"192.168.10.203","token":"eb4f017d08becc0941ea051c7bacf3fc"}]
       - PORT=8080
+      - TZ=Asia/Shanghai
 
 volumes:
   power-data:

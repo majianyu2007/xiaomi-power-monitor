@@ -151,8 +151,8 @@ applyTheme(getTheme());
 
 function fmt(n, d=1) { return n != null ? Number(n).toFixed(d) : '--'; }
 function fmtYuan(n) { return n != null ? '¥' + Number(n).toFixed(2) : '--'; }
-function fmtDate(d) { return d.substring(5); } // MM-DD
-function fmtMonth(m) { return m.substring(5); } // MM
+function fmtDate(d) { return d.substring(5); }
+function fmtMonth(m) { return m.substring(5); }
 
 function updateTime() {
   const now = new Date();
@@ -241,12 +241,20 @@ async function refresh(deviceId) {
   try {
     const rp = getRangeParams();
     const sid = encodeURIComponent(deviceId);
-    const [latest, config] = await Promise.all([
-      fetch(`${API}/api/latest/${sid}`).then(r=>r.json()),
-      fetch(`${API}/api/config`).then(r=>r.json()),
-    ]);
+
+    // Determine dashboard view param from range type
+    let viewParam;
+    if (rp.type === 'day') viewParam = 'today';
+    else if (rp.type === 'year') viewParam = 'year';
+    else viewParam = 'range';
+
+    // Single aggregated API call
+    const url = `${API}/api/dashboard/${sid}?view=${viewParam}&start_date=${rp.start}&end_date=${rp.end}`;
+    const data = await fetch(url).then(r => r.json());
 
     // Update live dot
+    const latest = data.latest || {};
+    const config = data.config || {};
     const dot = document.getElementById('dot_' + deviceId) || document.getElementById('globalDot');
     if (dot) dot.className = latest.reachable ? 'live-dot' : 'live-dot offline';
     const globalDot = document.getElementById('globalDot');
@@ -257,20 +265,16 @@ async function refresh(deviceId) {
 
     if (rp.type === 'day') {
       // === Day view ===
-      const [today, readings, hourly, peak, cost] = await Promise.all([
-        fetch(`${API}/api/stats/${sid}/today?date=${rp.date}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/today/readings?date=${rp.date}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/hourly?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/peak?date=${rp.date}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/cost?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-      ]);
-
-      const d = latest;
-      const online = d.reachable;
-      const on = d.power_on;
+      const today = data.today_stats || {};
+      const readings = data.readings || [];
+      const hourly = data.hourly || [];
+      const peak = data.peak || {};
+      const cost = data.cost || {};
+      const on = latest.power_on;
+      const online = latest.reachable;
       const dateLabel = rp.date === new Date().toISOString().slice(0,10) ? '今日' : rp.date;
 
-      statsHtml = buildStatsCards(d, today, online, on, dateLabel);
+      statsHtml = buildStatsCards(latest, today, online, on, dateLabel);
       chartsHtml = `
       <div class="section-col">
         <div class="card"><div class="card-title">📊 ${dateLabel}实时功率</div><div class="chart-wrap"><canvas id="chartLive" height="180"></canvas></div></div>
@@ -295,14 +299,11 @@ async function refresh(deviceId) {
       paintTempChart(hourly);
 
     } else if (rp.type === 'year') {
-      // === Year view: monthly bars ===
-      const [monthly, cost] = await Promise.all([
-        fetch(`${API}/api/stats/${sid}/monthly?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/cost?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-      ]);
+      // === Year view ===
+      const monthly = data.monthly || [];
+      const cost = data.cost || {};
 
-      const d = latest;
-      statsHtml = buildRangeStats(d, cost, rp.start, rp.end);
+      statsHtml = buildRangeStats(latest, cost, rp.start, rp.end);
       chartsHtml = `
       <div class="section-col">
         <div class="card"><div class="card-title">📅 月度用电趋势 (kWh)</div><div class="chart-wrap"><canvas id="chartMonthly" height="200"></canvas></div></div>
@@ -323,15 +324,12 @@ async function refresh(deviceId) {
 
     } else {
       // === Range view (7d, 30d, 90d, custom) ===
-      const [daily, cost, standby, heatmap] = await Promise.all([
-        fetch(`${API}/api/stats/${sid}/daily?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/cost?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/standby?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-        fetch(`${API}/api/stats/${sid}/heatmap?start_date=${rp.start}&end_date=${rp.end}`).then(r=>r.json()),
-      ]);
+      const daily = data.daily || [];
+      const cost = data.cost || {};
+      const standby = data.standby || {};
+      const heatmap = data.heatmap || [];
 
-      const d = latest;
-      statsHtml = buildRangeStats(d, cost, rp.start, rp.end);
+      statsHtml = buildRangeStats(latest, cost, rp.start, rp.end);
       chartsHtml = `
       <div class="section-col">
         <div class="card"><div class="card-title">📅 每日用电 (${fmtDate(rp.start)} ~ ${fmtDate(rp.end)})</div><div class="chart-wrap"><canvas id="chartDaily" height="180"></canvas></div></div>
@@ -594,7 +592,6 @@ function paintHeatmap(data) {
   if (!container) return;
   if (!data.length) { container.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:20px">暂无数据</div>'; return; }
 
-  // Find max power for coloring
   const maxW = Math.max(...data.map(d => d.max_w || 0), 1);
   const hours = Array.from({length: 24}, (_, i) => i);
   const days = [...new Set(data.map(d => d.day))].sort();
